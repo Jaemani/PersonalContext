@@ -1,0 +1,4 @@
+interface:
+  display_name: "Personal Engineering"
+  short_description: "Apply personal engineering quality gates contextually"
+  default_prompt: "Use $personal-engineering to complete this repository task with proportionate planning and verification."

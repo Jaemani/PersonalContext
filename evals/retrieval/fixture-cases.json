@@ -1,0 +1,18 @@
+[
+  {
+    "id": "parser-boundary",
+    "query": "unknown manifest version parser validation",
+    "expectedTitles": [
+      "Fail closed at the parser boundary"
+    ],
+    "limit": 3
+  },
+  {
+    "id": "evidence-verdict",
+    "query": "keep raw evidence separate from classification verdict",
+    "expectedTitles": [
+      "Separate evidence from verdict"
+    ],
+    "limit": 3
+  }
+]
