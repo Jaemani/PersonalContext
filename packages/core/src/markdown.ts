@@ -28,7 +28,12 @@ async function markdownFiles(root: string): Promise<string[]> {
   async function visit(directory: string): Promise<void> {
     const entries = await fs.readdir(directory, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+      if (
+        entry.isDirectory() &&
+        (entry.name.startsWith(".") || ignoredDirectories.has(entry.name))
+      ) {
+        continue;
+      }
       const file = path.join(directory, entry.name);
       if (entry.isDirectory()) {
         await visit(file);

@@ -3,10 +3,24 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PersonalKnowledgeIndex } from "./index.js";
 import { readKnowledgeStore } from "./markdown.js";
+import { watchKnowledgeStore, type LiveReloadHandle } from "./live-reload.js";
 
 export interface RuntimeOptions {
   storePath: string;
   playbookPath?: string | null;
+}
+
+export async function createReloadingKnowledgeRuntime(
+  options: RuntimeOptions,
+  onReload?: (index: PersonalKnowledgeIndex) => void,
+): Promise<{ index: () => PersonalKnowledgeIndex; watcher: LiveReloadHandle }> {
+  let current = await createKnowledgeRuntime(options);
+  const watcher = await watchKnowledgeStore(options.storePath, async () => {
+    // Build a complete new index before swapping, so readers never observe a partial reload.
+    current = await createKnowledgeRuntime(options);
+    onReload?.(current);
+  });
+  return { index: () => current, watcher };
 }
 
 export async function createKnowledgeRuntime(
@@ -28,6 +42,9 @@ export async function findBundledPlaybook(): Promise<string | null> {
   const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [
     environmentPath,
+    // Managed bundles may place portable playbooks beside dist/runtime.
+    path.resolve(moduleDirectory, "../../../runtime/playbook"),
+    path.resolve(moduleDirectory, "../../runtime/playbook"),
     path.resolve(moduleDirectory, "../../../playbook"),
     path.resolve(moduleDirectory, "../../../../playbook"),
     path.resolve(process.cwd(), "playbook"),
@@ -45,7 +62,10 @@ export async function findBundledPlaybook(): Promise<string | null> {
 }
 
 export * from "./doctor.js";
+export * from "./config.js";
 export * from "./evaluate.js";
 export * from "./index.js";
 export * from "./markdown.js";
 export * from "./types.js";
+export * from "./vault.js";
+export * from "./live-reload.js";

@@ -1,4 +1,6 @@
 import path from "node:path";
+import { promises as fs } from "node:fs";
+import os from "node:os";
 import { describe, expect, it } from "vitest";
 import {
   PersonalKnowledgeIndex,
@@ -44,5 +46,18 @@ describe("portable knowledge contract", () => {
     expect(report.valid).toBe(true);
     expect(report.countsByType.experience).toBe(1);
     expect(report.findings).toEqual([]);
+  });
+
+  it("skips hidden Markdown folders", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "pc-hidden-"));
+    try {
+      await fs.mkdir(path.join(root, ".private"));
+      await fs.writeFile(path.join(root, "visible.md"), "# Visible");
+      await fs.writeFile(path.join(root, ".private", "secret.md"), "# Secret");
+      const records = await readKnowledgeStore(root);
+      expect(records.map((record) => record.title)).toEqual(["Visible"]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });

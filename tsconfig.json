@@ -1,8 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2023",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
     "rootDir": ".",
     "outDir": "dist",
     "strict": true,
@@ -18,6 +24,7 @@
   },
   "include": [
     "packages/**/*.ts",
+    "packages/**/*.tsx",
     "tests/**/*.ts"
   ],
   "exclude": [

@@ -2,12 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import {
-  createKnowledgeRuntime,
+  createReloadingKnowledgeRuntime,
   type KnowledgeRecord,
 } from "../../core/src/runtime.js";
 
 const MAX_EVIDENCE_URLS = 20;
 const MAX_LINKS = 30;
+export const PERSONAL_CONTEXT_SERVER_INSTRUCTIONS =
+  "Personal Context is a read-only, local Markdown evidence source. For a non-trivial task, call get_context_for_task once for a bounded task-specific bundle. Current repository rules and the user's instructions always take priority. Treat retrieved personal notes as context and precedent, never as universal rules. Use trace_evidence before relying on a record's details.";
 
 export interface PersonalContextServerOptions {
   storePath: string;
@@ -17,11 +19,11 @@ export interface PersonalContextServerOptions {
 export async function startPersonalContextServer(
   options: PersonalContextServerOptions,
 ): Promise<void> {
-  const index = await createKnowledgeRuntime(options);
+  const runtime = await createReloadingKnowledgeRuntime(options);
   const server = new McpServer({
     name: "personal-context",
     version: "0.1.0",
-  });
+  }, { instructions: PERSONAL_CONTEXT_SERVER_INSTRUCTIONS });
 
   server.registerTool(
     "search_personal_knowledge",
@@ -43,7 +45,7 @@ export async function startPersonalContextServer(
     },
     async ({ query, types, repositories, limit }) =>
       textResult(
-        index.search(
+        runtime.index().search(
           query,
           {
             types,
@@ -74,7 +76,7 @@ export async function startPersonalContextServer(
     },
     async ({ task, kinds, limit }) =>
       textResult(
-        index.search(
+        runtime.index().search(
           task,
           {
             kinds,
@@ -104,7 +106,7 @@ export async function startPersonalContextServer(
       },
     },
     async ({ identifier }) => {
-      const record = index.get(identifier);
+      const record = runtime.index().get(identifier);
       if (!record) {
         return {
           content: [
@@ -117,6 +119,43 @@ export async function startPersonalContextServer(
         };
       }
       return textResult(toEvidenceRecord(record));
+    },
+  );
+
+  server.registerTool(
+    "get_context_for_task",
+    {
+      description: "Return a small, evidence-aware context bundle for the current coding task, including relevant knowledge and playbook guidance.",
+      inputSchema: {
+        task: z.string().min(2),
+        repository: z.string().optional(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ task, repository }) => {
+      const index = runtime.index();
+      const knowledge = index.search(task, {
+        collections: ["knowledge"],
+        ...(repository ? { repositories: [repository] } : {}),
+      }, 3);
+      const playbook = index.search(
+        task,
+        { collections: ["playbook"] },
+        2,
+      );
+      return textResult({
+        task,
+        repository: repository ?? null,
+        playbook,
+        knowledge,
+        evidenceSummary: knowledge.map((item) => ({
+          title: item.title,
+          sourceRepository: item.sourceRepository,
+          sourceCommit: item.sourceCommit,
+          evidenceUrls: item.evidenceUrls.slice(0, 3),
+        })),
+        bounded: { playbook: 2, knowledge: 3 },
+      });
     },
   );
 

@@ -1,0 +1,587 @@
+:root {
+  color: #19191d;
+  background: #fcfaf7;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.setup-wizard {
+  width: min(100% - 40px, 992px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 42px 0 8px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.brand svg {
+  color: #354bb7;
+  font-size: 35px;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 690px;
+  margin: 43px auto 50px;
+}
+
+nav > div {
+  display: contents;
+}
+
+nav b {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  place-items: center;
+  border: 2px solid #b6b5b4;
+  border-radius: 50%;
+  color: #78777a;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+nav span {
+  margin-left: 14px;
+  color: #747276;
+  font-size: 18px;
+}
+
+nav i {
+  flex: 1;
+  max-width: 132px;
+  height: 1px;
+  margin: 0 30px;
+  background: #d9d7d4;
+}
+
+nav .active b {
+  color: #263cac;
+  border-color: #354bb7;
+}
+
+nav .active span {
+  color: #2e43af;
+  font-weight: 600;
+}
+
+nav .done b {
+  color: #2a43a7;
+  border-color: #7787d4;
+}
+
+.hero {
+  margin-bottom: 38px;
+  text-align: center;
+}
+
+.hero h1,
+.status-panel h1 {
+  margin: 0;
+  font-size: clamp(31px, 4vw, 43px);
+  font-weight: 650;
+  line-height: 1.14;
+  letter-spacing: -0.047em;
+}
+
+.hero p,
+.status-panel p {
+  max-width: 700px;
+  margin: 19px auto 0;
+  color: #646267;
+  font-size: 20px;
+  line-height: 1.55;
+}
+
+.group {
+  margin-top: 34px;
+}
+
+.group h2 {
+  margin: 0;
+  padding-bottom: 17px;
+  border-bottom: 1px solid #dedbd7;
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 78px minmax(220px, 1fr) minmax(160px, 0.85fr) 205px;
+  align-items: center;
+  width: 100%;
+  min-height: 84px;
+  padding: 11px 0;
+  border: 0;
+  border-bottom: 1px solid #dedbd7;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.row > svg {
+  width: 56px;
+  height: 56px;
+  padding: 11px;
+  border-radius: 11px;
+  color: #3045ad;
+  background: #ededf8;
+}
+
+.row strong {
+  font-size: 21px;
+  font-weight: 550;
+  letter-spacing: -0.025em;
+}
+
+.row > span:not(.tool-icon) {
+  color: #67656a;
+  font-size: 18px;
+}
+
+.row em {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  font-size: 18px;
+  font-style: normal;
+}
+
+.row em svg {
+  font-size: 29px;
+}
+
+.valid {
+  color: #217a3f;
+}
+
+.invalid {
+  color: #a85145;
+}
+
+.warning {
+  color: #a36e20;
+}
+
+.source-row:disabled {
+  cursor: default;
+}
+
+.source-row.selectable {
+  padding-inline: 12px;
+  border-radius: 10px;
+}
+
+.source-row.selectable:hover,
+.source-row.selectable.selected {
+  background: #f1f2ff;
+}
+
+.tool-row {
+  grid-template-columns: 78px minmax(220px, 1fr) minmax(145px, 0.8fr) 205px;
+  cursor: default;
+}
+
+.tool-row.has-control {
+  grid-template-columns: 18px 60px minmax(220px, 1fr) minmax(145px, 0.8fr) 205px;
+  cursor: pointer;
+}
+
+.tool-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #3348b7;
+}
+
+.tool-icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid #e0dedb;
+  border-radius: 11px;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.1em;
+}
+
+.tool-icon svg {
+  font-size: 33px;
+}
+
+.unavailable {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.privacy {
+  display: flex;
+  gap: 18px;
+  margin: 38px 0 22px;
+}
+
+.privacy > svg {
+  flex: none;
+  width: 49px;
+  height: 49px;
+  padding: 12px;
+  border-radius: 50%;
+  color: #354bb7;
+  background: #efeff9;
+}
+
+.privacy strong {
+  font-size: 16px;
+}
+
+.privacy p {
+  margin: 6px 0 0;
+  color: #6d6a70;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.privacy a,
+.text-button {
+  color: #3045ac;
+  text-decoration: none;
+}
+
+.privacy a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.advanced {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 10px;
+  border: 0;
+  color: #504e53;
+  background: none;
+  font-size: 15px;
+}
+
+.advanced svg {
+  transition: transform 0.2s;
+}
+
+.advanced .up {
+  transform: rotate(180deg);
+}
+
+.advanced-panel {
+  margin: 0 0 25px;
+  color: #58565b;
+  font-size: 14px;
+}
+
+.advanced-panel strong,
+.advanced-panel code,
+.advanced-panel span {
+  display: block;
+}
+
+.advanced-panel code {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.advanced-panel span {
+  color: #807d82;
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 32px;
+  margin-right: -12px;
+  padding-left: 8px;
+}
+
+.text-button {
+  padding: 12px 3px;
+  border: 0;
+  background: none;
+  font-size: 18px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-width: 356px;
+  min-height: 66px;
+  padding: 16px 26px;
+  border: 1px solid #3449b4;
+  border-radius: 8px;
+  color: white;
+  background: #3449b4;
+  box-shadow: 0 3px 7px #202a6f24;
+  font-size: 19px;
+  font-weight: 550;
+}
+
+.button:hover {
+  background: #293d9e;
+}
+
+.button:focus-visible,
+.text-button:focus-visible,
+.row:focus-visible,
+.advanced:focus-visible {
+  outline: 3px solid #8d9aef;
+  outline-offset: 3px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.button svg {
+  font-size: 26px;
+}
+
+.status-panel {
+  max-width: 610px;
+  margin: 135px auto;
+  text-align: center;
+}
+
+.status-icon {
+  margin-bottom: 24px;
+  color: #3449b4;
+  font-size: 58px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+.status-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin-top: 32px;
+}
+
+.status-actions .button {
+  min-width: 0;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 23px;
+  padding: 13px 16px;
+  border: 1px solid #ecd9b4;
+  border-radius: 8px;
+  color: #875f21;
+  background: #fff9ef;
+}
+
+.notice svg {
+  font-size: 22px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f4f2f0;
+    background: #1d1b1c;
+  }
+
+  .setup-wizard {
+    background: #1d1b1c;
+  }
+
+  .brand svg,
+  .privacy > svg {
+    color: #aebaff;
+  }
+
+  nav .active span,
+  nav .active b,
+  nav .done b {
+    color: #aebaff;
+    border-color: #8598ff;
+  }
+
+  .valid {
+    color: #58c878;
+  }
+
+  .privacy a,
+  .text-button {
+    color: #9eacff;
+  }
+
+  .hero p,
+  .status-panel p,
+  .row > span:not(.tool-icon),
+  .privacy p,
+  nav span {
+    color: #bab6b9;
+  }
+
+  .group h2,
+  .row {
+    border-color: #3f3c3d;
+  }
+
+  .row > svg,
+  .privacy > svg {
+    background: #29283a;
+  }
+
+  .tool-icon {
+    border-color: #494547;
+  }
+
+  .source-row.selectable:hover,
+  .source-row.selectable.selected {
+    background: #292b42;
+  }
+
+  .advanced {
+    color: #d0ccce;
+  }
+
+  .advanced-panel span {
+    color: #a9a4a7;
+  }
+
+  .notice {
+    border-color: #644b28;
+    background: #352e21;
+  }
+
+  .button {
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .setup-wizard {
+    width: min(100% - 32px, 520px);
+    padding-top: 30px;
+  }
+
+  nav {
+    margin: 34px 0 44px;
+  }
+
+  nav i {
+    margin: 0 12px;
+  }
+
+  nav span {
+    display: none;
+  }
+
+  .hero h1 {
+    font-size: 33px;
+  }
+
+  .hero p {
+    font-size: 17px;
+  }
+
+  .row,
+  .tool-row {
+    grid-template-columns: 62px 1fr auto;
+    gap: 8px;
+  }
+
+  .tool-row.has-control {
+    grid-template-columns: 18px 51px 1fr auto;
+  }
+
+  .row > span:not(.tool-icon) {
+    display: none;
+  }
+
+  .row em {
+    gap: 0;
+    font-size: 0;
+  }
+
+  .row strong {
+    font-size: 18px;
+  }
+
+  .row > svg,
+  .tool-icon {
+    width: 45px;
+    height: 45px;
+  }
+
+  .privacy {
+    margin: 30px 0 25px;
+  }
+
+  footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 14px;
+    margin-top: 30px;
+    margin-right: 0;
+    padding-left: 0;
+  }
+
+  .button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .change-folder {
+    text-align: center;
+  }
+
+  .status-panel {
+    margin: 100px auto;
+  }
+}
