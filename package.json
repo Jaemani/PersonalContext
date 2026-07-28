@@ -45,6 +45,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:package": "npm run build && node scripts/package-smoke.mjs",
+    "eval:private": "tsx scripts/private-eval.ts",
     "dev": "vite --config packages/setup-ui/vite.config.ts",
     "dev:cli": "tsx packages/cli/src/index.ts"
   },
