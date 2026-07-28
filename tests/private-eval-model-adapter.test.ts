@@ -26,7 +26,11 @@ describe("Codex private evaluation model adapter", () => {
       }
       return { exitCode: 0, stdout: "", stderr: "" };
     };
-    const adapter = new CodexEvaluationModelAdapter({ runner });
+    const adapter = new CodexEvaluationModelAdapter({
+      runner,
+      model: "gpt-test",
+      reasoningEffort: "high",
+    });
     const prompt = "Return one JSON object.";
 
     await expect(adapter.completeJson(prompt)).resolves.toEqual({
@@ -51,6 +55,9 @@ describe("Codex private evaluation model adapter", () => {
         'web_search="disabled"',
         'shell_environment_policy.inherit="none"',
         "--output-last-message",
+        "--model",
+        "gpt-test",
+        'model_reasoning_effort="high"',
       ]),
     );
     expect(call?.args).not.toContain(prompt);

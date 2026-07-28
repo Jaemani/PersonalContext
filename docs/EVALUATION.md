@@ -54,6 +54,8 @@ npm run eval:private -- \
   --expected-sha <sha256> \
   --store <knowledge-root> \
   --output <private-run-root> \
+  --model <exact-model-id> \
+  --reasoning-effort <exact-effort> \
   --conditions A,B,C
 ```
 

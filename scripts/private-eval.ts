@@ -90,7 +90,12 @@ async function main(): Promise<void> {
     : [];
   const records = await readKnowledgeStore(storePath, "knowledge");
   const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
-  const model = new CodexEvaluationModelAdapter();
+  const modelName = requiredOption("--model");
+  const reasoningEffort = requiredOption("--reasoning-effort");
+  const model = new CodexEvaluationModelAdapter({
+    model: modelName,
+    reasoningEffort,
+  });
   const result = await runPrivateDocumentationEvaluation({
     manifest: loaded.manifest,
     manifestSummary: loaded.summary,
@@ -101,7 +106,7 @@ async function main(): Promise<void> {
     runId,
     forbiddenRoots: [storePath, process.cwd()],
     runnerRevision: process.env.PERSONAL_CONTEXT_RUNNER_REVISION ?? "working-tree",
-    modelDescription: process.env.PERSONAL_CONTEXT_EVAL_MODEL ?? "codex-default",
+    modelDescription: `codex:${modelName}:${reasoningEffort}`,
     currentRules,
     routerContract,
     methodContracts,

@@ -34,6 +34,8 @@ export type CommandRunner = (
 export interface CodexEvaluationModelAdapterOptions {
   command?: string;
   runner?: CommandRunner;
+  model?: string;
+  reasoningEffort?: string;
 }
 
 export class CodexEvaluationModelAdapter
@@ -41,10 +43,14 @@ export class CodexEvaluationModelAdapter
 {
   private readonly command: string;
   private readonly runner: CommandRunner;
+  private readonly model: string | null;
+  private readonly reasoningEffort: string | null;
 
   constructor(options: CodexEvaluationModelAdapterOptions = {}) {
     this.command = options.command ?? "codex";
     this.runner = options.runner ?? runBoundedCommand;
+    this.model = safeOption(options.model);
+    this.reasoningEffort = safeOption(options.reasoningEffort);
   }
 
   async completeJson(prompt: string): Promise<unknown> {
@@ -59,7 +65,12 @@ export class CodexEvaluationModelAdapter
     const finalMessagePath = path.join(temporaryRoot, "last-message.json");
 
     try {
-      const args = codexArguments(temporaryRoot, finalMessagePath);
+      const args = codexArguments(
+        temporaryRoot,
+        finalMessagePath,
+        this.model,
+        this.reasoningEffort,
+      );
       let result: CommandRunnerResult;
       try {
         result = await this.runner(this.command, args, {
@@ -91,8 +102,13 @@ export class CodexEvaluationModelAdapter
   }
 }
 
-function codexArguments(cwd: string, outputPath: string): string[] {
-  return [
+function codexArguments(
+  cwd: string,
+  outputPath: string,
+  model: string | null,
+  reasoningEffort: string | null,
+): string[] {
+  const args = [
     "exec",
     "--ephemeral",
     "--ignore-user-config",
@@ -114,6 +130,11 @@ function codexArguments(cwd: string, outputPath: string): string[] {
     "--output-last-message",
     outputPath,
   ];
+  if (model) args.push("--model", model);
+  if (reasoningEffort) {
+    args.push("--config", `model_reasoning_effort="${reasoningEffort}"`);
+  }
+  return args;
 }
 
 function minimalCodexEnvironment(): Readonly<Record<string, string>> {
@@ -165,6 +186,14 @@ function parseSingleJsonObject(output: string): Record<string, unknown> {
     throw new Error("The Codex evaluation returned invalid JSON.");
   }
   return value as Record<string, unknown>;
+}
+
+function safeOption(value: string | undefined): string | null {
+  if (value === undefined) return null;
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(value)) {
+    throw new Error("The Codex evaluation model parameter is invalid.");
+  }
+  return value;
 }
 
 const runBoundedCommand: CommandRunner = async (
