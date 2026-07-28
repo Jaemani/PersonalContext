@@ -1,5 +1,12 @@
 import { spawn } from "node:child_process";
-import { chmod, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -8,7 +15,30 @@ const COMMAND_OUTPUT_LIMIT_BYTES = 64 * 1_024;
 const FINAL_MESSAGE_LIMIT_BYTES = 256 * 1_024;
 
 export interface EvaluationModelAdapter {
-  completeJson(prompt: string): Promise<unknown>;
+  completeJson(
+    prompt: string,
+    outputSchema?: EvaluationOutputSchema,
+  ): Promise<unknown>;
+}
+
+export type EvaluationOutputSchema = Readonly<Record<string, unknown>>;
+
+export type EvaluationModelErrorCode =
+  | "COMMAND_FAILED"
+  | "INVALID_JSON";
+
+export class EvaluationModelError extends Error {
+  constructor(
+    readonly code: EvaluationModelErrorCode,
+    readonly rawOutput: string | null,
+  ) {
+    super(
+      code === "COMMAND_FAILED"
+        ? "The Codex evaluation command failed."
+        : "The Codex evaluation returned invalid JSON.",
+    );
+    this.name = "EvaluationModelError";
+  }
 }
 
 export interface CommandRunnerOptions {
@@ -53,7 +83,10 @@ export class CodexEvaluationModelAdapter
     this.reasoningEffort = safeOption(options.reasoningEffort);
   }
 
-  async completeJson(prompt: string): Promise<unknown> {
+  async completeJson(
+    prompt: string,
+    outputSchema?: EvaluationOutputSchema,
+  ): Promise<unknown> {
     if (!prompt.trim()) {
       throw new Error("The evaluation prompt is empty.");
     }
@@ -63,11 +96,22 @@ export class CodexEvaluationModelAdapter
     );
     await chmod(temporaryRoot, 0o700);
     const finalMessagePath = path.join(temporaryRoot, "last-message.json");
+    const outputSchemaPath = outputSchema
+      ? path.join(temporaryRoot, "output-schema.json")
+      : null;
 
     try {
+      if (outputSchemaPath) {
+        await writeFile(outputSchemaPath, JSON.stringify(outputSchema), {
+          encoding: "utf8",
+          flag: "wx",
+          mode: 0o600,
+        });
+      }
       const args = codexArguments(
         temporaryRoot,
         finalMessagePath,
+        outputSchemaPath,
         this.model,
         this.reasoningEffort,
       );
@@ -81,15 +125,22 @@ export class CodexEvaluationModelAdapter
           maxOutputBytes: COMMAND_OUTPUT_LIMIT_BYTES,
         });
       } catch {
-        throw new Error("The Codex evaluation command failed.");
+        throw new EvaluationModelError("COMMAND_FAILED", null);
       }
 
       if (result.exitCode !== 0) {
-        throw new Error("The Codex evaluation command failed.");
+        throw new EvaluationModelError(
+          "COMMAND_FAILED",
+          await readOptionalBoundedFinalMessage(finalMessagePath),
+        );
       }
 
       const output = await readBoundedFinalMessage(finalMessagePath);
-      return parseSingleJsonObject(output);
+      try {
+        return parseSingleJsonObject(output);
+      } catch {
+        throw new EvaluationModelError("INVALID_JSON", output);
+      }
     } finally {
       try {
         await rm(temporaryRoot, { recursive: true, force: true });
@@ -105,6 +156,7 @@ export class CodexEvaluationModelAdapter
 function codexArguments(
   cwd: string,
   outputPath: string,
+  outputSchemaPath: string | null,
   model: string | null,
   reasoningEffort: string | null,
 ): string[] {
@@ -130,6 +182,9 @@ function codexArguments(
     "--output-last-message",
     outputPath,
   ];
+  if (outputSchemaPath) {
+    args.push("--output-schema", outputSchemaPath);
+  }
   if (model) args.push("--model", model);
   if (reasoningEffort) {
     args.push("--config", `model_reasoning_effort="${reasoningEffort}"`);
@@ -168,6 +223,16 @@ async function readBoundedFinalMessage(outputPath: string): Promise<string> {
     return await readFile(outputPath, "utf8");
   } catch {
     throw new Error("The Codex evaluation returned invalid JSON.");
+  }
+}
+
+async function readOptionalBoundedFinalMessage(
+  outputPath: string,
+): Promise<string | null> {
+  try {
+    return await readBoundedFinalMessage(outputPath);
+  } catch {
+    return null;
   }
 }
 

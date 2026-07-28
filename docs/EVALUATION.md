@@ -88,7 +88,11 @@ The runner fails closed when:
 Codex evaluation runs are ephemeral, ignore user config and rules, disable web
 search, inherit no shell environment, use a read-only empty temporary
 workspace, and remove that workspace after every success or failure. Prompts
-are passed over stdin and are not written into run metadata.
+are passed over stdin and are not written into run metadata. Routing and
+artifact responses are constrained with explicit Codex output schemas. If a
+command or response contract fails, the immutable private attempt records a
+`failure.json` envelope and any available raw model response before stopping;
+failed output is never copied to Git or the production knowledge root.
 
 The current runner implements the Documentation Router A/B/C contract. The
 Operational Context suite has a separate condition meaning and is validation

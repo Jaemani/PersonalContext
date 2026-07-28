@@ -9,7 +9,11 @@ import {
   hashPrivateJson,
   type BlindReviewSource,
 } from "./blind-review.js";
-import type { EvaluationModelAdapter } from "./model-adapter.js";
+import {
+  EvaluationModelError,
+  type EvaluationModelAdapter,
+  type EvaluationOutputSchema,
+} from "./model-adapter.js";
 import {
   assertNoRawSecret,
   assertWithheldValuesAbsent,
@@ -18,7 +22,10 @@ import {
   type EvaluationCondition,
   type EvaluationContextRecord,
 } from "./prompts.js";
-import { createPrivateRunStore } from "./run-store.js";
+import {
+  createPrivateRunStore,
+  type PrivateRunStore,
+} from "./run-store.js";
 import {
   assertCompleteEvaluationConditions,
   assertExactRunnerRevision,
@@ -45,6 +52,52 @@ export interface PrivateDocumentationRunOptions {
   routerContract: string;
   methodContracts: Partial<Record<DocumentationMethod, string>>;
 }
+
+const DOCUMENTATION_METHODS = [
+  "decision",
+  "experiment",
+  "incident",
+  "report",
+  "none",
+] as const;
+
+const ROUTING_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "primary_method",
+    "reason",
+    "uncertainties",
+    "secondary_artifacts",
+  ],
+  properties: {
+    primary_method: { type: "string", enum: DOCUMENTATION_METHODS },
+    reason: { type: "string" },
+    uncertainties: { type: "array", items: { type: "string" } },
+    secondary_artifacts: {
+      type: "array",
+      items: { type: "string", enum: DOCUMENTATION_METHODS },
+    },
+  },
+} as const satisfies EvaluationOutputSchema;
+
+const ARTIFACT_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["routing", "artifact"],
+  properties: {
+    routing: ROUTING_OUTPUT_SCHEMA,
+    artifact: {
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "content"],
+      properties: {
+        kind: { type: "string" },
+        content: { type: "string" },
+      },
+    },
+  },
+} as const satisfies EvaluationOutputSchema;
 
 export async function runPrivateDocumentationEvaluation(
   options: PrivateDocumentationRunOptions,
@@ -118,9 +171,32 @@ export async function runPrivateDocumentationEvaluation(
           : {}),
       });
       assertWithheldValuesAbsent(routingPrompt, withheldValues);
-      const rawRouting = await options.model.completeJson(routingPrompt);
-      assertNoRawSecret(JSON.stringify(rawRouting));
-      const routing = parseRoutingProposal(rawRouting);
+      const rawRouting = await completeModelJson({
+        model: options.model,
+        prompt: routingPrompt,
+        outputSchema: ROUTING_OUTPUT_SCHEMA,
+        store,
+        runId: options.runId,
+        caseId: testCase.input.id,
+        condition,
+        stage: "routing",
+      });
+      let routing;
+      try {
+        assertNoRawSecret(JSON.stringify(rawRouting));
+        routing = parseRoutingProposal(rawRouting);
+      } catch {
+        await writeFailure({
+          store,
+          runId: options.runId,
+          caseId: testCase.input.id,
+          condition,
+          stage: "routing-contract",
+          errorCode: "INVALID_ROUTING_RESULT",
+          rawModel: rawRouting,
+        });
+        throw new Error("The private evaluation routing result is invalid.");
+      }
 
       const selectedMethodContract =
         routing.primary_method === "none"
@@ -140,9 +216,32 @@ export async function runPrivateDocumentationEvaluation(
           : {}),
       });
       assertWithheldValuesAbsent(artifactPrompt, withheldValues);
-      const rawArtifact = await options.model.completeJson(artifactPrompt);
-      assertNoRawSecret(JSON.stringify(rawArtifact));
-      const artifact = parseArtifact(rawArtifact);
+      const rawArtifact = await completeModelJson({
+        model: options.model,
+        prompt: artifactPrompt,
+        outputSchema: ARTIFACT_OUTPUT_SCHEMA,
+        store,
+        runId: options.runId,
+        caseId: testCase.input.id,
+        condition,
+        stage: "artifact",
+      });
+      let artifact;
+      try {
+        assertNoRawSecret(JSON.stringify(rawArtifact));
+        artifact = parseArtifact(rawArtifact);
+      } catch {
+        await writeFailure({
+          store,
+          runId: options.runId,
+          caseId: testCase.input.id,
+          condition,
+          stage: "artifact-contract",
+          errorCode: "INVALID_ARTIFACT_RESULT",
+          rawModel: rawArtifact,
+        });
+        throw new Error("The private evaluation artifact result is invalid.");
+      }
       const mechanical = evaluateMechanically(
         routing.primary_method,
         artifact.content,
@@ -242,6 +341,61 @@ function methodSummaries(
   return (["decision", "experiment", "incident", "report"] as const).map(
     (method) => `${method}\n${contracts[method] ?? "unavailable"}`,
   );
+}
+
+async function completeModelJson(options: {
+  model: EvaluationModelAdapter;
+  prompt: string;
+  outputSchema: EvaluationOutputSchema;
+  store: PrivateRunStore;
+  runId: string;
+  caseId: string;
+  condition: EvaluationCondition;
+  stage: "routing" | "artifact";
+}): Promise<unknown> {
+  try {
+    return await options.model.completeJson(
+      options.prompt,
+      options.outputSchema,
+    );
+  } catch (error) {
+    await writeFailure({
+      store: options.store,
+      runId: options.runId,
+      caseId: options.caseId,
+      condition: options.condition,
+      stage: `${options.stage}-command`,
+      errorCode:
+        error instanceof EvaluationModelError
+          ? error.code
+          : "MODEL_ADAPTER_FAILED",
+      rawModel:
+        error instanceof EvaluationModelError ? error.rawOutput : null,
+    });
+    throw new Error(`The private evaluation ${options.stage} command failed.`);
+  }
+}
+
+async function writeFailure(options: {
+  store: PrivateRunStore;
+  runId: string;
+  caseId: string;
+  condition: EvaluationCondition;
+  stage: string;
+  errorCode: string;
+  rawModel: unknown;
+}): Promise<void> {
+  await options.store.writeJson("failure.json", {
+    runId: options.runId,
+    caseId: options.caseId,
+    condition: options.condition,
+    stage: options.stage,
+    errorCode: options.errorCode,
+    rawModel: options.rawModel,
+    rawModelSha256:
+      options.rawModel === null ? null : hashPrivateJson(options.rawModel),
+    failedAt: new Date().toISOString(),
+  });
 }
 
 function toContextRecord(hit: SearchHit): EvaluationContextRecord {

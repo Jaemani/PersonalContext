@@ -23,6 +23,7 @@ describe("private documentation evaluation runner", () => {
   it("runs A/B/C without exposing withheld rubric material", async () => {
     const root = await temp();
     const prompts: string[] = [];
+    const outputSchemas: unknown[] = [];
     const responses = [
       routing("decision"),
       artifact("decision", "Context and consequences."),
@@ -32,8 +33,9 @@ describe("private documentation evaluation runner", () => {
       artifact("experiment", "Hypothesis and stop rule."),
     ];
     const model = {
-      async completeJson(prompt: string) {
+      async completeJson(prompt: string, outputSchema?: unknown) {
         prompts.push(prompt);
+        outputSchemas.push(outputSchema);
         return responses.shift();
       },
     };
@@ -88,6 +90,19 @@ describe("private documentation evaluation runner", () => {
     expect(prompts[2]).toContain("relevant support");
     expect(prompts[4]).toContain("Choose one primary method");
     expect(prompts[5]).toContain("Hypothesis, setup");
+    expect(outputSchemas[0]).toMatchObject({
+      properties: {
+        primary_method: {
+          enum: ["decision", "experiment", "incident", "report", "none"],
+        },
+      },
+    });
+    expect(outputSchemas[1]).toMatchObject({
+      required: ["routing", "artifact"],
+      properties: {
+        artifact: { required: ["kind", "content"] },
+      },
+    });
 
     const conditionA = path.join(root, "runs", "run-1", "condition-a");
     expect(await readdir(conditionA)).toEqual(["DOC-001"]);
@@ -132,6 +147,70 @@ describe("private documentation evaluation runner", () => {
     expect(metadataEnd.blindReviewPacketSha256).toBe(
       result.blindReviewPacketSha256,
     );
+  });
+
+  it("preserves an invalid model result in the failed private attempt", async () => {
+    const root = await temp();
+    const model = {
+      async completeJson() {
+        return routing("architecture-decision-record");
+      },
+    };
+
+    await expect(
+      runPrivateDocumentationEvaluation({
+        manifest: manifest(),
+        manifestSummary: {
+          schemaVersion: 1,
+          suiteId: DOCUMENTATION_EVALUATION_SUITE_ID,
+          suiteKind: "documentation",
+          privacy: "private-local-only",
+          createdAt: "2026-07-28",
+          productionIndexAllowed: false,
+          itemCount: 1,
+          sha256: "a".repeat(64),
+        },
+        records: [
+          record("knowledge:Decisions/target.md", "Target", "answer"),
+          record(
+            "knowledge:Support.md",
+            "Durable artifact support",
+            "relevant support for choosing a durable artifact",
+          ),
+        ],
+        conditions: ["A", "B", "C"],
+        model,
+        outputRoot: path.join(root, "runs"),
+        runId: "run-failed",
+        forbiddenRoots: [path.join(root, "knowledge")],
+        runnerRevision: "b".repeat(40),
+        modelDescription: "fake",
+        currentRules: ["Repository rules take priority."],
+        routerContract: "Choose one primary method.",
+        methodContracts: {
+          decision: "Context, options, decision, consequences.",
+          experiment: "Hypothesis, setup, measures, stop rule.",
+          incident: "Impact, timeline, cause, prevention.",
+          report: "State, evidence, risk, next action.",
+        },
+      }),
+    ).rejects.toThrow(/^The private evaluation routing result is invalid\.$/);
+
+    const failure = JSON.parse(
+      await readFile(
+        path.join(root, "runs", "run-failed", "failure.json"),
+        "utf8",
+      ),
+    );
+    expect(failure).toMatchObject({
+      runId: "run-failed",
+      caseId: "DOC-001",
+      condition: "A",
+      stage: "routing-contract",
+      errorCode: "INVALID_ROUTING_RESULT",
+      rawModel: { primary_method: "architecture-decision-record" },
+    });
+    expect(failure.rawModelSha256).toMatch(/^[a-f0-9]{64}$/);
   });
 });
 

@@ -15,9 +15,14 @@ interface CapturedCall {
 describe("Codex private evaluation model adapter", () => {
   it("runs Codex with a private ephemeral read-only profile over stdin", async () => {
     let call: CapturedCall | undefined;
+    let capturedSchema: unknown;
+    let capturedSchemaMode: number | undefined;
     const runner: CommandRunner = async (command, args, options) => {
       call = { command, args, options };
       const outputPath = argumentValue(args, "--output-last-message");
+      const outputSchemaPath = argumentValue(args, "--output-schema");
+      capturedSchema = JSON.parse(await readFile(outputSchemaPath, "utf8"));
+      capturedSchemaMode = (await stat(outputSchemaPath)).mode & 0o777;
       await writeFile(outputPath, '{"primary_method":"experiment"}', {
         mode: 0o600,
       });
@@ -32,8 +37,16 @@ describe("Codex private evaluation model adapter", () => {
       reasoningEffort: "high",
     });
     const prompt = "Return one JSON object.";
+    const outputSchema = {
+      type: "object",
+      additionalProperties: false,
+      required: ["primary_method"],
+      properties: {
+        primary_method: { type: "string", enum: ["experiment"] },
+      },
+    };
 
-    await expect(adapter.completeJson(prompt)).resolves.toEqual({
+    await expect(adapter.completeJson(prompt, outputSchema)).resolves.toEqual({
       primary_method: "experiment",
     });
 
@@ -55,11 +68,16 @@ describe("Codex private evaluation model adapter", () => {
         'web_search="disabled"',
         'shell_environment_policy.inherit="none"',
         "--output-last-message",
+        "--output-schema",
         "--model",
         "gpt-test",
         'model_reasoning_effort="high"',
       ]),
     );
+    expect(capturedSchema).toEqual(outputSchema);
+    if (process.platform !== "win32") {
+      expect(capturedSchemaMode).toBe(0o600);
+    }
     expect(call?.args).not.toContain(prompt);
     expect(call?.options.environment).not.toHaveProperty("GITHUB_TOKEN");
     await expect(access(call!.options.cwd)).rejects.toMatchObject({
