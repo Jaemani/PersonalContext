@@ -19,6 +19,12 @@ Unknown fields are preserved by the source file and ignored by the reader.
 Missing optional fields do not block indexing. An Experience without a source
 repository is a contract error.
 
+Portable producers may add an optional stable `id` and
+`knowledge_contract: 1`. The current runtime does not require those fields or
+replace its path-scoped internal record ID with them; it indexes the Markdown
+record while preserving the producer boundary. This keeps older notes valid and
+leaves versioned catalog identity to a separately reviewed milestone.
+
 Wikilinks are graph edges without an assumed predicate. Explicit relationship
 predicates may be added in a future schema version without changing current
 Markdown readability.

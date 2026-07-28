@@ -34,7 +34,7 @@ try {
   const npmCli = process.env.npm_execpath;
   if (!npmCli) throw new Error("npm_execpath is unavailable.");
   const packed = await run(process.execPath, [npmCli, "pack", "--json", "--ignore-scripts", "--pack-destination", temporaryRoot], process.cwd(), environment);
-  const report = JSON.parse(packed);
+  const report = parseJsonArray(packed, "npm pack");
   const archive = path.join(temporaryRoot, report[0]?.filename ?? "");
   await access(archive);
 
@@ -136,6 +136,23 @@ function runtimeRoot({ home, xdgData, localAppData }) {
   if (process.platform === "darwin") return path.join(home, "Library", "Application Support", "personal-context", "runtime");
   if (process.platform === "win32") return path.join(localAppData, "personal-context", "runtime");
   return path.join(xdgData, "personal-context", "runtime");
+}
+
+function parseJsonArray(output, commandName) {
+  const candidates = [];
+  if (output.trimStart().startsWith("[")) candidates.push(output.indexOf("["));
+  for (let index = output.indexOf("\n["); index >= 0; index = output.indexOf("\n[", index + 2)) {
+    candidates.push(index + 1);
+  }
+  for (const index of candidates.reverse()) {
+    try {
+      const parsed = JSON.parse(output.slice(index).trim());
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // npm lifecycle output can precede the final --json report.
+    }
+  }
+  throw new Error(`${commandName} did not return a JSON array.`);
 }
 
 function run(command, args, cwd, env) {

@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, symlink } from "node:fs/promises";
+import { access, mkdtemp, mkdir, readFile, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import {
   createPrivateRunStore,
   privatePathMode,
   PrivateRunStoreError,
+  validatePrivateRunLocation,
 } from "../packages/evaluation/src/run-store.js";
 
 const temporary: string[] = [];
@@ -18,6 +19,18 @@ afterEach(async () => {
 });
 
 describe("private evaluation run store", () => {
+  it("validates an isolated prospective root without creating output", async () => {
+    const root = await temp();
+    const outputRoot = path.join(root, "runs");
+
+    await validatePrivateRunLocation({
+      outputRoot,
+      forbiddenRoots: [path.join(root, "knowledge")],
+    });
+
+    await expect(access(outputRoot)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("writes immutable private JSON files", async () => {
     const root = await temp();
     const store = await createPrivateRunStore({

@@ -15,6 +15,8 @@ export interface PrivateRunStoreOptions {
   forbiddenRoots: string[];
 }
 
+export type PrivateRunLocationOptions = Omit<PrivateRunStoreOptions, "runId">;
+
 export interface PrivateRunStore {
   attemptRoot: string;
   writeJson(relativePath: string, value: unknown): Promise<string>;
@@ -42,13 +44,7 @@ export async function createPrivateRunStore(
     throw new PrivateRunStoreError("INVALID_RUN_ID");
   }
 
-  const outputRoot = await canonicalProspectivePath(options.outputRoot);
-  for (const forbiddenRoot of options.forbiddenRoots) {
-    const canonicalForbidden = await canonicalProspectivePath(forbiddenRoot);
-    if (pathsOverlap(outputRoot, canonicalForbidden)) {
-      throw new PrivateRunStoreError("PROTECTED_ROOT_OVERLAP");
-    }
-  }
+  const outputRoot = await validatedOutputRoot(options);
 
   let attemptRoot: string;
   try {
@@ -99,6 +95,25 @@ export async function createPrivateRunStore(
       return target;
     },
   };
+}
+
+export async function validatePrivateRunLocation(
+  options: PrivateRunLocationOptions,
+): Promise<void> {
+  await validatedOutputRoot(options);
+}
+
+async function validatedOutputRoot(
+  options: PrivateRunLocationOptions,
+): Promise<string> {
+  const outputRoot = await canonicalProspectivePath(options.outputRoot);
+  for (const forbiddenRoot of options.forbiddenRoots) {
+    const canonicalForbidden = await canonicalProspectivePath(forbiddenRoot);
+    if (pathsOverlap(outputRoot, canonicalForbidden)) {
+      throw new PrivateRunStoreError("PROTECTED_ROOT_OVERLAP");
+    }
+  }
+  return outputRoot;
 }
 
 function safeChildPath(root: string, relativePath: string): string {

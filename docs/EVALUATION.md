@@ -60,7 +60,8 @@ npm run eval:private -- \
 ```
 
 Use `--validate-only` to verify the manifest, permissions, hash, source
-records, and pre-index exclusions without invoking a model or creating a run.
+records, pre-index exclusions, output-root isolation, exact model and reasoning
+pins, and requested conditions without invoking a model or creating a run.
 
 The runner fails closed when:
 

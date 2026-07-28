@@ -8,6 +8,7 @@ import { loadPrivateEvaluationManifest } from "../packages/evaluation/src/manife
 import { CodexEvaluationModelAdapter } from "../packages/evaluation/src/model-adapter.js";
 import type { EvaluationCondition } from "../packages/evaluation/src/prompts.js";
 import { runPrivateDocumentationEvaluation } from "../packages/evaluation/src/runner.js";
+import { validatePrivateRunLocation } from "../packages/evaluation/src/run-store.js";
 import {
   DOCUMENTATION_EVALUATION_SUITE_ID,
   type DocumentationMethod,
@@ -26,10 +27,16 @@ async function main(): Promise<void> {
   const manifestPath = requiredOption("--manifest");
   const expectedSha256 = requiredOption("--expected-sha");
   const storePath = path.resolve(requiredOption("--store"));
+  const outputRoot = path.resolve(requiredOption("--output"));
+  const modelName = requiredOption("--model");
+  const reasoningEffort = requiredOption("--reasoning-effort");
+  const conditions = parseConditions(option("--conditions") ?? "A,B,C");
+  const forbiddenRoots = [storePath, process.cwd()];
   const loaded = await loadPrivateEvaluationManifest({
     manifestPath,
     expectedSha256,
   });
+  await validatePrivateRunLocation({ outputRoot, forbiddenRoots });
   if (args.includes("--validate-only")) {
     let exclusionCount = 0;
     if (loaded.manifest.suiteId === DOCUMENTATION_EVALUATION_SUITE_ID) {
@@ -50,6 +57,10 @@ async function main(): Promise<void> {
         itemCount: loaded.summary.itemCount,
         manifestSha256: loaded.summary.sha256,
         exclusionCount,
+        conditions,
+        modelPinned: Boolean(modelName),
+        reasoningEffortPinned: Boolean(reasoningEffort),
+        outputIsolated: true,
         valid: true,
       })}\n`,
     );
@@ -60,8 +71,6 @@ async function main(): Promise<void> {
       "This runner revision supports the documentation suite only. Operational conditions use their own contract.",
     );
   }
-  const outputRoot = path.resolve(requiredOption("--output"));
-
   const methodRoot = path.resolve(
     option("--method-root") ??
       path.join(storePath, "Methods", "Documentation"),
@@ -90,8 +99,6 @@ async function main(): Promise<void> {
     : [];
   const records = await readKnowledgeStore(storePath, "knowledge");
   const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
-  const modelName = requiredOption("--model");
-  const reasoningEffort = requiredOption("--reasoning-effort");
   const model = new CodexEvaluationModelAdapter({
     model: modelName,
     reasoningEffort,
@@ -100,11 +107,11 @@ async function main(): Promise<void> {
     manifest: loaded.manifest,
     manifestSummary: loaded.summary,
     records,
-    conditions: parseConditions(option("--conditions") ?? "A,B,C"),
+    conditions,
     model,
     outputRoot,
     runId,
-    forbiddenRoots: [storePath, process.cwd()],
+    forbiddenRoots,
     runnerRevision: process.env.PERSONAL_CONTEXT_RUNNER_REVISION ?? "working-tree",
     modelDescription: `codex:${modelName}:${reasoningEffort}`,
     currentRules,
