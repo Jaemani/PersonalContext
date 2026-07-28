@@ -39,3 +39,44 @@ Compare real tasks with and without the personal engineering skill. Review:
 
 Run the same MCP calls from Codex and Claude Code in a clean repository while
 Obsidian is closed. The canonical result set must be provider-independent.
+
+## Private evaluation runner
+
+Private task inputs, expected labels, and raw model artifacts stay in the
+operating system's application-data directory. They are never product
+fixtures, runtime knowledge, npm package content, or Git history.
+
+The source-only developer command is:
+
+```bash
+npm run eval:private -- \
+  --manifest <private-manifest> \
+  --expected-sha <sha256> \
+  --store <knowledge-root> \
+  --output <private-run-root> \
+  --conditions A,B,C
+```
+
+Use `--validate-only` to verify the manifest, permissions, hash, source
+records, and pre-index exclusions without invoking a model or creating a run.
+
+The runner fails closed when:
+
+- the parent directory or manifest is not private;
+- the manifest hash differs from its frozen value;
+- production indexing is not explicitly disabled;
+- a target record cannot be excluded before index construction;
+- withheld rubric material enters a prompt;
+- a raw secret pattern appears in a prompt or model result;
+- the run output overlaps the knowledge root or source repository;
+- an attempt or result would overwrite prior output.
+
+Codex evaluation runs are ephemeral, ignore user config and rules, disable web
+search, inherit no shell environment, use a read-only empty temporary
+workspace, and remove that workspace after every success or failure. Prompts
+are passed over stdin and are not written into run metadata.
+
+The current runner implements the Documentation Router A/B/C contract. The
+Operational Context suite has a separate condition meaning and is validation
+only until that contract is implemented. No private model run has been
+performed as part of the runner implementation.
