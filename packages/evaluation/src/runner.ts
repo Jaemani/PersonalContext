@@ -1,10 +1,14 @@
-import { createHash } from "node:crypto";
 import type { KnowledgeRecord, SearchHit } from "../../core/src/types.js";
 import {
   parseDocumentationCases,
   parseRoutingProposal,
 } from "./documentation-cases.js";
 import { buildEligibleRecordSet } from "./eligible-records.js";
+import {
+  createBlindedHumanReviewArtifacts,
+  hashPrivateJson,
+  type BlindReviewSource,
+} from "./blind-review.js";
 import type { EvaluationModelAdapter } from "./model-adapter.js";
 import {
   assertNoRawSecret,
@@ -15,6 +19,11 @@ import {
   type EvaluationContextRecord,
 } from "./prompts.js";
 import { createPrivateRunStore } from "./run-store.js";
+import {
+  assertCompleteEvaluationConditions,
+  assertExactRunnerRevision,
+  hashKnowledgeSnapshot,
+} from "./run-contract.js";
 import type {
   DocumentationEvaluationManifest,
   DocumentationMethod,
@@ -39,8 +48,17 @@ export interface PrivateDocumentationRunOptions {
 
 export async function runPrivateDocumentationEvaluation(
   options: PrivateDocumentationRunOptions,
-): Promise<{ runId: string; caseCount: number; resultHashes: string[] }> {
+): Promise<{
+  runId: string;
+  caseCount: number;
+  resultHashes: string[];
+  knowledgeSnapshotSha256: string;
+  blindReviewPacketSha256: string;
+}> {
+  assertCompleteEvaluationConditions(options.conditions);
+  const runnerRevision = assertExactRunnerRevision(options.runnerRevision);
   const cases = parseDocumentationCases(options.manifest);
+  const knowledgeSnapshotSha256 = hashKnowledgeSnapshot(options.records);
   const store = await createPrivateRunStore({
     outputRoot: options.outputRoot,
     runId: options.runId,
@@ -51,14 +69,24 @@ export async function runPrivateDocumentationEvaluation(
     runId: options.runId,
     suiteId: options.manifestSummary.suiteId,
     manifestSha256: options.manifestSummary.sha256,
-    runnerRevision: options.runnerRevision,
+    runnerRevision,
+    knowledgeSnapshotSha256,
     model: options.modelDescription,
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+    },
     conditions: options.conditions,
     caseIds: cases.map((item) => item.input.id),
     startedAt,
   });
 
-  const evaluations: unknown[] = [];
+  const evaluations: Array<Record<string, unknown> & {
+    caseId: string;
+    condition: EvaluationCondition;
+  }> = [];
+  const blindReviewSources: BlindReviewSource[] = [];
   const resultHashes: string[] = [];
   for (const testCase of cases) {
     const eligible = buildEligibleRecordSet(options.records, {
@@ -145,9 +173,7 @@ export async function runPrivateDocumentationEvaluation(
         mechanical,
       };
       await store.writeJson(relativePath, result);
-      resultHashes.push(
-        createHash("sha256").update(JSON.stringify(result)).digest("hex"),
-      );
+      resultHashes.push(hashPrivateJson(result));
       evaluations.push({
         caseId: testCase.input.id,
         condition,
@@ -156,21 +182,58 @@ export async function runPrivateDocumentationEvaluation(
         ...mechanical,
         requiresBlindedHumanReview: true,
       });
+      blindReviewSources.push({
+        caseId: testCase.input.id,
+        taskInput: testCase.input.taskInput,
+        condition,
+        routing,
+        artifact,
+      });
     }
   }
 
+  const blindReview = createBlindedHumanReviewArtifacts({
+    runId: options.runId,
+    suiteId: options.manifest.suiteId,
+    sources: blindReviewSources,
+  });
+  await store.writeJson("blind-review/packet.json", blindReview.packet);
+  const reviewIdByResult = new Map(
+    blindReview.key.map((entry) => [
+      `${entry.caseId}\u0000${entry.condition}`,
+      entry.reviewId,
+    ]),
+  );
+  const blindedEvaluations = evaluations.map((evaluation) => {
+    const blindReviewId = reviewIdByResult.get(
+      `${evaluation.caseId}\u0000${evaluation.condition}`,
+    );
+    if (!blindReviewId) {
+      throw new Error("A blinded-review result key is missing.");
+    }
+    return { ...evaluation, blindReviewId };
+  });
   await store.writeJson("evaluation.json", {
     runId: options.runId,
     suiteId: options.manifest.suiteId,
-    evaluations,
+    blindReviewKey: blindReview.key,
+    evaluations: blindedEvaluations,
   });
   await store.writeJson("metadata-end.json", {
     runId: options.runId,
     completedAt: new Date().toISOString(),
     resultCount: resultHashes.length,
     resultHashes,
+    knowledgeSnapshotSha256,
+    blindReviewPacketSha256: blindReview.packetSha256,
   });
-  return { runId: options.runId, caseCount: cases.length, resultHashes };
+  return {
+    runId: options.runId,
+    caseCount: cases.length,
+    resultHashes,
+    knowledgeSnapshotSha256,
+    blindReviewPacketSha256: blindReview.packetSha256,
+  };
 }
 
 function methodSummaries(

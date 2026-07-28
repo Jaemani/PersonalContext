@@ -1,4 +1,11 @@
-import { access, mkdtemp, mkdir, readFile, symlink } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  mkdtemp,
+  mkdir,
+  readFile,
+  symlink,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -30,6 +37,25 @@ describe("private evaluation run store", () => {
 
     await expect(access(outputRoot)).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  it.runIf(process.platform !== "win32")(
+    "rejects an existing output root with public permissions",
+    async () => {
+      const root = await temp();
+      const outputRoot = path.join(root, "runs");
+      await mkdir(outputRoot);
+      await chmod(outputRoot, 0o755);
+
+      await expect(
+        validatePrivateRunLocation({
+          outputRoot,
+          forbiddenRoots: [path.join(root, "knowledge")],
+        }),
+      ).rejects.toMatchObject({
+        code: "OUTPUT_ROOT_PERMISSION_MISMATCH",
+      } satisfies Partial<PrivateRunStoreError>);
+    },
+  );
 
   it("writes immutable private JSON files", async () => {
     const root = await temp();

@@ -1,6 +1,7 @@
 import {
   chmod,
   link,
+  lstat,
   mkdir,
   open,
   realpath,
@@ -27,6 +28,7 @@ export type PrivateRunStoreErrorCode =
   | "PROTECTED_ROOT_OVERLAP"
   | "ATTEMPT_EXISTS"
   | "INVALID_OUTPUT_PATH"
+  | "OUTPUT_ROOT_PERMISSION_MISMATCH"
   | "OUTPUT_EXISTS"
   | "STORE_UNAVAILABLE";
 
@@ -111,6 +113,23 @@ async function validatedOutputRoot(
     const canonicalForbidden = await canonicalProspectivePath(forbiddenRoot);
     if (pathsOverlap(outputRoot, canonicalForbidden)) {
       throw new PrivateRunStoreError("PROTECTED_ROOT_OVERLAP");
+    }
+  }
+  try {
+    const outputStat = await lstat(path.resolve(options.outputRoot));
+    if (outputStat.isSymbolicLink() || !outputStat.isDirectory()) {
+      throw new PrivateRunStoreError("INVALID_OUTPUT_PATH");
+    }
+    if (
+      process.platform !== "win32" &&
+      (outputStat.mode & 0o7777) !== 0o700
+    ) {
+      throw new PrivateRunStoreError("OUTPUT_ROOT_PERMISSION_MISMATCH");
+    }
+  } catch (error) {
+    if (error instanceof PrivateRunStoreError) throw error;
+    if (!isNodeError(error) || error.code !== "ENOENT") {
+      throw new PrivateRunStoreError("STORE_UNAVAILABLE");
     }
   }
   return outputRoot;

@@ -54,6 +54,7 @@ npm run eval:private -- \
   --expected-sha <sha256> \
   --store <knowledge-root> \
   --output <private-run-root> \
+  --runner-revision <exact-full-git-object-id> \
   --model <exact-model-id> \
   --reasoning-effort <exact-effort> \
   --conditions A,B,C
@@ -61,10 +62,19 @@ npm run eval:private -- \
 
 Use `--validate-only` to verify the manifest, permissions, hash, source
 records, pre-index exclusions, output-root isolation, exact model and reasoning
-pins, and requested conditions without invoking a model or creating a run.
+pins, exact runner revision, the knowledge snapshot hash, and the complete
+A/B/C condition set without invoking a model or creating a run.
+
+Completed runs create `blind-review/packet.json`. That packet contains the
+private task, routing proposal, and artifact under opaque review IDs, but no
+condition label, retrieved-context identity, raw model envelope, mechanical
+score, expected method, or withheld rubric. The condition key remains in the
+separate private `evaluation.json` file.
 
 The runner fails closed when:
 
+- A/B/C are not requested together in one immutable run;
+- the declared full runner revision differs from the checked-out clean harness;
 - the parent directory or manifest is not private;
 - the manifest hash differs from its frozen value;
 - production indexing is not explicitly disabled;
@@ -72,6 +82,7 @@ The runner fails closed when:
 - withheld rubric material enters a prompt;
 - a raw secret pattern appears in a prompt or model result;
 - the run output overlaps the knowledge root or source repository;
+- an existing run output root is not an owner-only `700` directory;
 - an attempt or result would overwrite prior output.
 
 Codex evaluation runs are ephemeral, ignore user config and rules, disable web

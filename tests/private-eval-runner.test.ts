@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, readdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -62,7 +63,7 @@ describe("private documentation evaluation runner", () => {
       outputRoot: path.join(root, "runs"),
       runId: "run-1",
       forbiddenRoots: [path.join(root, "knowledge")],
-      runnerRevision: "test-revision",
+      runnerRevision: "b".repeat(40),
       modelDescription: "fake",
       currentRules: ["Repository rules take priority."],
       routerContract: "Choose one primary method.",
@@ -79,6 +80,8 @@ describe("private documentation evaluation runner", () => {
     expect(result.resultHashes.every((value) => /^[a-f0-9]{64}$/.test(value))).toBe(
       true,
     );
+    expect(result.knowledgeSnapshotSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.blindReviewPacketSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(prompts).toHaveLength(6);
     expect(prompts.join("\n")).not.toContain("unique-hidden-element");
     expect(prompts[0]).not.toContain("relevant support");
@@ -88,10 +91,47 @@ describe("private documentation evaluation runner", () => {
 
     const conditionA = path.join(root, "runs", "run-1", "condition-a");
     expect(await readdir(conditionA)).toEqual(["DOC-001"]);
+    const conditionAText = await readFile(
+      path.join(conditionA, "DOC-001", "result.json"),
+      "utf8",
+    );
+    expect(createHash("sha256").update(conditionAText).digest("hex")).toBe(
+      result.resultHashes[0],
+    );
     const evaluation = JSON.parse(
       await readFile(path.join(root, "runs", "run-1", "evaluation.json"), "utf8"),
     );
     expect(evaluation.evaluations).toHaveLength(3);
+    expect(evaluation.blindReviewKey).toHaveLength(3);
+    expect(
+      evaluation.evaluations.every(
+        (item: { blindReviewId?: string }) =>
+          typeof item.blindReviewId === "string",
+      ),
+    ).toBe(true);
+    const packetText = await readFile(
+      path.join(root, "runs", "run-1", "blind-review", "packet.json"),
+      "utf8",
+    );
+    const packet = JSON.parse(packetText);
+    expect(packet.cases[0]?.results).toHaveLength(3);
+    expect(packetText).not.toContain('"condition":');
+    expect(packetText).not.toContain("unique-hidden-element");
+    expect(createHash("sha256").update(packetText).digest("hex")).toBe(
+      result.blindReviewPacketSha256,
+    );
+    const metadataStart = JSON.parse(
+      await readFile(path.join(root, "runs", "run-1", "metadata-start.json"), "utf8"),
+    );
+    const metadataEnd = JSON.parse(
+      await readFile(path.join(root, "runs", "run-1", "metadata-end.json"), "utf8"),
+    );
+    expect(metadataStart.knowledgeSnapshotSha256).toBe(
+      result.knowledgeSnapshotSha256,
+    );
+    expect(metadataEnd.blindReviewPacketSha256).toBe(
+      result.blindReviewPacketSha256,
+    );
   });
 });
 

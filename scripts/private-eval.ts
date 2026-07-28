@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { readKnowledgeStore } from "../packages/core/src/markdown.js";
+import type { KnowledgeRecord } from "../packages/core/src/types.js";
 import { parseDocumentationCases } from "../packages/evaluation/src/documentation-cases.js";
 import { buildEligibleRecordSet } from "../packages/evaluation/src/eligible-records.js";
 import { loadPrivateEvaluationManifest } from "../packages/evaluation/src/manifest.js";
@@ -10,11 +13,18 @@ import type { EvaluationCondition } from "../packages/evaluation/src/prompts.js"
 import { runPrivateDocumentationEvaluation } from "../packages/evaluation/src/runner.js";
 import { validatePrivateRunLocation } from "../packages/evaluation/src/run-store.js";
 import {
+  assertCompleteEvaluationConditions,
+  assertExactRunnerRevision,
+  assertRunnerSourceState,
+  hashKnowledgeSnapshot,
+} from "../packages/evaluation/src/run-contract.js";
+import {
   DOCUMENTATION_EVALUATION_SUITE_ID,
   type DocumentationMethod,
 } from "../packages/evaluation/src/types.js";
 
 const args = process.argv.slice(2);
+const execFileAsync = promisify(execFile);
 
 try {
   await main();
@@ -31,26 +41,39 @@ async function main(): Promise<void> {
   const modelName = requiredOption("--model");
   const reasoningEffort = requiredOption("--reasoning-effort");
   const conditions = parseConditions(option("--conditions") ?? "A,B,C");
-  const forbiddenRoots = [storePath, process.cwd()];
+  assertCompleteEvaluationConditions(conditions);
+  const runnerRevision = assertExactRunnerRevision(
+    requiredOption("--runner-revision"),
+  );
+  const sourceRepositoryRoot = await verifyRunnerSourceRevision(runnerRevision);
+  const forbiddenRoots = [storePath, sourceRepositoryRoot];
   const loaded = await loadPrivateEvaluationManifest({
     manifestPath,
     expectedSha256,
   });
   await validatePrivateRunLocation({ outputRoot, forbiddenRoots });
-  if (args.includes("--validate-only")) {
-    let exclusionCount = 0;
-    if (loaded.manifest.suiteId === DOCUMENTATION_EVALUATION_SUITE_ID) {
-      const records = await readKnowledgeStore(storePath, "knowledge");
-      for (const testCase of parseDocumentationCases(loaded.manifest)) {
-        const eligible = buildEligibleRecordSet(records, {
-          suiteId: loaded.manifest.suiteId,
-          caseId: testCase.input.id,
-          sourceRecords: testCase.input.sourceRecords,
-          excludedEvidenceIds: testCase.input.excludedEvidenceIds,
-        });
-        exclusionCount += eligible.excludedRecordIds.length;
-      }
+  let records: KnowledgeRecord[] = [];
+  let exclusionCount = 0;
+  let knowledgeSnapshotSha256: string | null = null;
+  let routerContract = "";
+  let methodContracts: Partial<Record<DocumentationMethod, string>> = {};
+  let currentRules: string[] = [];
+  if (loaded.manifest.suiteId === DOCUMENTATION_EVALUATION_SUITE_ID) {
+    records = await readKnowledgeStore(storePath, "knowledge");
+    knowledgeSnapshotSha256 = hashKnowledgeSnapshot(records);
+    ({ routerContract, methodContracts, currentRules } =
+      await loadDocumentationContracts(storePath));
+    for (const testCase of parseDocumentationCases(loaded.manifest)) {
+      const eligible = buildEligibleRecordSet(records, {
+        suiteId: loaded.manifest.suiteId,
+        caseId: testCase.input.id,
+        sourceRecords: testCase.input.sourceRecords,
+        excludedEvidenceIds: testCase.input.excludedEvidenceIds,
+      });
+      exclusionCount += eligible.excludedRecordIds.length;
     }
+  }
+  if (args.includes("--validate-only")) {
     process.stdout.write(
       `${JSON.stringify({
         suiteId: loaded.summary.suiteId,
@@ -60,6 +83,8 @@ async function main(): Promise<void> {
         conditions,
         modelPinned: Boolean(modelName),
         reasoningEffortPinned: Boolean(reasoningEffort),
+        runnerRevisionPinned: true,
+        knowledgeSnapshotSha256,
         outputIsolated: true,
         valid: true,
       })}\n`,
@@ -71,6 +96,43 @@ async function main(): Promise<void> {
       "This runner revision supports the documentation suite only. Operational conditions use their own contract.",
     );
   }
+  const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
+  const model = new CodexEvaluationModelAdapter({
+    model: modelName,
+    reasoningEffort,
+  });
+  const result = await runPrivateDocumentationEvaluation({
+    manifest: loaded.manifest,
+    manifestSummary: loaded.summary,
+    records,
+    conditions,
+    model,
+    outputRoot,
+    runId,
+    forbiddenRoots,
+    runnerRevision,
+    modelDescription: `codex:${modelName}:${reasoningEffort}`,
+    currentRules,
+    routerContract,
+    methodContracts,
+  });
+  process.stdout.write(
+    `${JSON.stringify({
+      runId: result.runId,
+      suiteId: loaded.summary.suiteId,
+      caseCount: result.caseCount,
+      resultCount: result.resultHashes.length,
+      knowledgeSnapshotSha256: result.knowledgeSnapshotSha256,
+      blindReviewPacketSha256: result.blindReviewPacketSha256,
+    })}\n`,
+  );
+}
+
+async function loadDocumentationContracts(storePath: string): Promise<{
+  routerContract: string;
+  methodContracts: Partial<Record<DocumentationMethod, string>>;
+  currentRules: string[];
+}> {
   const methodRoot = path.resolve(
     option("--method-root") ??
       path.join(storePath, "Methods", "Documentation"),
@@ -94,38 +156,61 @@ async function main(): Promise<void> {
     ),
   );
   const rulesPath = option("--rules");
-  const currentRules = rulesPath
-    ? [await readFile(path.resolve(rulesPath), "utf8")]
-    : [];
-  const records = await readKnowledgeStore(storePath, "knowledge");
-  const runId = `run-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
-  const model = new CodexEvaluationModelAdapter({
-    model: modelName,
-    reasoningEffort,
-  });
-  const result = await runPrivateDocumentationEvaluation({
-    manifest: loaded.manifest,
-    manifestSummary: loaded.summary,
-    records,
-    conditions,
-    model,
-    outputRoot,
-    runId,
-    forbiddenRoots,
-    runnerRevision: process.env.PERSONAL_CONTEXT_RUNNER_REVISION ?? "working-tree",
-    modelDescription: `codex:${modelName}:${reasoningEffort}`,
-    currentRules,
+  return {
     routerContract,
     methodContracts,
+    currentRules: rulesPath
+      ? [await readFile(path.resolve(rulesPath), "utf8")]
+      : [],
+  };
+}
+
+async function verifyRunnerSourceRevision(
+  declaredRevision: string,
+): Promise<string> {
+  try {
+    const repositoryRoot = (
+      await runGit(["rev-parse", "--show-toplevel"], process.cwd())
+    ).trim();
+    const currentRevision = (
+      await runGit(["rev-parse", "HEAD"], repositoryRoot)
+    ).trim();
+    const sourceStatus = await runGit(
+      [
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+        "--",
+        "package.json",
+        "package-lock.json",
+        "scripts/private-eval.ts",
+        "packages/core",
+        "packages/evaluation",
+      ],
+      repositoryRoot,
+    );
+    assertRunnerSourceState({
+      declaredRevision,
+      currentRevision,
+      dirty: sourceStatus.trim().length > 0,
+    });
+    return repositoryRoot;
+  } catch (error) {
+    if (error instanceof Error && /runner|revision|Git object ID/i.test(error.message)) {
+      throw error;
+    }
+    throw new Error("Runner source revision could not be verified.");
+  }
+}
+
+async function runGit(arguments_: string[], cwd: string): Promise<string> {
+  const result = await execFileAsync("git", arguments_, {
+    cwd,
+    encoding: "utf8",
+    timeout: 10_000,
+    maxBuffer: 65_536,
   });
-  process.stdout.write(
-    `${JSON.stringify({
-      runId: result.runId,
-      suiteId: loaded.summary.suiteId,
-      caseCount: result.caseCount,
-      resultCount: result.resultHashes.length,
-    })}\n`,
-  );
+  return String(result.stdout);
 }
 
 function requiredOption(name: string): string {
