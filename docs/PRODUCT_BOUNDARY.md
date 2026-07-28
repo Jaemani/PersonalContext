@@ -8,9 +8,12 @@ knowledge. It works without Obsidian and does not ingest GitHub history.
 - Markdown and frontmatter normalization
 - local indexing and bounded retrieval
 - read-only MCP tools
+- one-time knowledge-source detection and validation
+- versioned local runtime installation
+- Codex and Claude Code connection through their official MCP CLIs
 - CLI diagnostics and evaluations
 - engineering playbooks
-- a provider-neutral personal engineering skill
+- an optional provider-neutral personal engineering skill
 
 ## Does not own
 
@@ -20,6 +23,8 @@ knowledge. It works without Obsidian and does not ingest GitHub history.
 - session checkpoints or harness handoff
 - automatic knowledge promotion
 - credentials, sessions, or agent caches
+- copies of agent configuration
+- LLM inference or automatic knowledge promotion
 
 Knowledge Sync produces portable Markdown. Personal Context consumes it.
 Carrylog may provide current-task state but remains a separate continuity

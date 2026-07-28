@@ -1,83 +1,129 @@
 # Personal Context
 
-Personal Context is a standalone, local-first knowledge runtime for coding
-agents. It reads Markdown knowledge stores, normalizes frontmatter and
-wikilinks, and exposes bounded read-only context through a CLI and MCP server.
-Obsidian is an optional editor, not a runtime dependency.
+Personal Context makes one Markdown knowledge base available to Codex and
+Claude Code from any codebase. It is local-first, evidence-aware, read-only, and
+does not copy files into repositories.
 
-It does not copy a Vault into every repository. One runtime reads one canonical
-Markdown store, and Codex, Claude Code, or another MCP client can retrieve only
-the records relevant to the current task.
+Obsidian is supported as an editor, but is not required at runtime. The
+companion Knowledge Sync plugin may write reviewed GitHub evidence into the
+same portable Markdown store; Personal Context only reads it.
 
-## Current scope
-
-- `personal-context doctor`: validate a knowledge store.
-- `personal-context query`: search knowledge and playbooks.
-- `personal-context eval`: run retrieval golden cases.
-- `personal-context mcp`: serve read-only MCP tools over stdio.
-- `skills/personal-engineering`: apply proportionate engineering quality gates.
-
-The existing Knowledge Sync plugin remains responsible for GitHub ingestion,
-review, and Markdown writes. Personal Context only consumes the resulting
-portable records.
-
-## Install
-
-From a clone:
+## One-minute setup
 
 ```bash
-git clone https://github.com/Jaemani/PersonalContext.git
-cd PersonalContext
-npm install
-npm link
+npx personal-context setup
 ```
 
-`npm install` builds the runtime and `npm link` makes `personal-context`
-available globally. This repository is not published to npm yet.
+The one-time local wizard:
 
-## Use
+1. detects Obsidian Vaults and ordinary Markdown knowledge folders;
+2. validates the best candidate;
+3. detects Codex and Claude Code;
+4. shows any existing connection conflict before replacement;
+5. installs a versioned, stable local runtime; and
+6. registers and verifies the runtime through each client's official MCP CLI.
 
-Point the runtime at the folder containing canonical knowledge notes. For the
-companion Knowledge Sync default layout, this is the Vault's `Wiki` folder, not
-the entire Vault:
+There is no API key, Skill installation, daemon, telemetry, GitHub login, or
+per-repository file.
+
+If a browser cannot open:
 
 ```bash
-personal-context doctor --store /path/to/vault/Wiki
-personal-context query "token validation" --store /path/to/vault/Wiki
-personal-context mcp --store /path/to/vault/Wiki
+npx personal-context setup --headless
 ```
 
-Set `PERSONAL_CONTEXT_STORE` to avoid passing `--store`. The bundled playbook
-is discovered automatically or can be overridden with
-`PERSONAL_CONTEXT_PLAYBOOK`.
+## Everyday use
 
-An MCP client needs only one stdio server entry:
+Once connected, Codex and Claude Code can call:
 
-```json
-{
-  "command": "personal-context",
-  "args": ["mcp", "--store", "/path/to/vault/Wiki"]
-}
+- `get_context_for_task` — up to two playbooks and three relevant knowledge
+  records with an evidence summary
+- `search_personal_knowledge` — bounded search over approved knowledge
+- `get_playbook_for_task` — relevant engineering workflow guidance
+- `trace_evidence` — one selected record with repository, commit, links, and a
+  bounded body
+
+The MCP instructions ask an agent to retrieve context once for a non-trivial
+task. Current repository rules and the user's instructions always take
+priority; personal notes are precedent, not universal rules.
+
+Markdown changes are debounced and swapped into a complete new in-memory index.
+Agents see successful edits without restarting. If filesystem watching fails,
+Personal Context falls back to low-frequency fingerprint polling.
+
+## CLI
+
+```text
+personal-context setup [--store path] [--headless] [--yes]
+personal-context status [--json]
+personal-context doctor [path] [--store path]
+personal-context query <text> [--store path] [--limit 5]
+personal-context mcp [--store path]
+personal-context connect --client codex|claude --yes
+personal-context disconnect --client codex|claude
+personal-context uninstall
 ```
 
-No Obsidian process, GitHub token, LLM API key, repository modification, or
-per-codebase knowledge copy is required. Restart the MCP server after the
-Markdown store changes; automatic live reload is intentionally outside the
-initial release.
+Store resolution is deterministic:
 
-## MCP tools
+1. `--store`
+2. `PERSONAL_CONTEXT_STORE`
+3. the source selected during setup
 
-- `search_personal_knowledge`: bounded search over approved personal knowledge
-- `get_playbook_for_task`: at most a few relevant engineering workflow entries
-- `trace_evidence`: provenance and bounded source content for one chosen record
+`disconnect` removes only the named `personal-context` MCP entry. `uninstall`
+removes both Personal Context MCP entries and its managed runtime, while
+preserving the knowledge folder, the selected-source preference, and every
+unrelated MCP server.
 
-All tools are read-only. Retrieval treats personal notes as evidence and
-precedent, not as instructions that override the active repository.
+## Portable knowledge contract
+
+Personal Context recursively reads Markdown and understands ordinary
+frontmatter and wikilinks. Evidence-aware records may use:
+
+```yaml
+---
+title: Fail closed at the parser boundary
+type: experience
+source_repository: owner/repository
+source_commit: 0123456789abcdef0123456789abcdef01234567
+tags:
+  - parser
+  - validation
+---
+```
+
+The connection between Personal Context and Knowledge Sync is only Markdown,
+frontmatter, and wikilinks. Neither repository imports the other.
+
+See [KNOWLEDGE_CONTRACT.md](docs/KNOWLEDGE_CONTRACT.md),
+[PRODUCT_BOUNDARY.md](docs/PRODUCT_BOUNDARY.md), and
+[SECURITY.md](SECURITY.md).
+
+## Privacy and installation
+
+The setup UI is served once from a random loopback port and closes when setup is
+finished. Runtime MCP communication is local stdio. Configuration stores only a
+schema version, the chosen knowledge root, and its last validation time.
+
+The npm artifact contains a dependency-free runtime bundle. It copies that
+bundle to the operating system's application-data directory by version and
+atomically advances a `current` pointer only after the new runtime passes an MCP
+smoke test. Agent settings point to the stable Node executable and managed
+runtime path, never to an ephemeral npx cache.
 
 ## Development
 
+Requires Node 22 or newer.
+
 ```bash
+npm install
 npm run check
 npm test
 npm run build
+npm run test:e2e
+npm run test:package
 ```
+
+The selected setup reference and implementation captures live in
+[`docs/design`](docs/design). The blocking accessibility and fidelity verdict is
+recorded in [`design-qa.md`](design-qa.md).
