@@ -10,7 +10,10 @@ import { buildEligibleRecordSet } from "../packages/evaluation/src/eligible-reco
 import { loadPrivateEvaluationManifest } from "../packages/evaluation/src/manifest.js";
 import { CodexEvaluationModelAdapter } from "../packages/evaluation/src/model-adapter.js";
 import type { EvaluationCondition } from "../packages/evaluation/src/prompts.js";
-import { runPrivateDocumentationEvaluation } from "../packages/evaluation/src/runner.js";
+import {
+  preflightPrivateDocumentationPrompts,
+  runPrivateDocumentationEvaluation,
+} from "../packages/evaluation/src/runner.js";
 import { validatePrivateRunLocation } from "../packages/evaluation/src/run-store.js";
 import {
   assertCompleteEvaluationConditions,
@@ -72,6 +75,14 @@ async function main(): Promise<void> {
       });
       exclusionCount += eligible.excludedRecordIds.length;
     }
+    preflightPrivateDocumentationPrompts({
+      manifest: loaded.manifest,
+      records,
+      conditions,
+      currentRules,
+      routerContract,
+      methodContracts,
+    });
   }
   if (args.includes("--validate-only")) {
     process.stdout.write(

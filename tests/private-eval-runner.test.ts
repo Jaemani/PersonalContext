@@ -212,6 +212,82 @@ describe("private documentation evaluation runner", () => {
     });
     expect(failure.rawModelSha256).toMatch(/^[a-f0-9]{64}$/);
   });
+
+  it("rejects deterministic rubric overlap before the first model call", async () => {
+    const root = await temp();
+    let modelCalls = 0;
+    const model = {
+      async completeJson() {
+        modelCalls += 1;
+        return routing("decision");
+      },
+    };
+    const overlappingManifest = manifest();
+    overlappingManifest.cases[0]!.requiredElements = [
+      "exact withheld overlap",
+    ];
+
+    await expect(
+      runPrivateDocumentationEvaluation({
+        manifest: overlappingManifest,
+        manifestSummary: {
+          schemaVersion: 1,
+          suiteId: DOCUMENTATION_EVALUATION_SUITE_ID,
+          suiteKind: "documentation",
+          privacy: "private-local-only",
+          createdAt: "2026-07-28",
+          productionIndexAllowed: false,
+          itemCount: 1,
+          sha256: "a".repeat(64),
+        },
+        records: [
+          record("knowledge:Decisions/target.md", "Target", "answer"),
+          record(
+            "knowledge:Support.md",
+            "Durable artifact support",
+            "context contains the exact withheld overlap value",
+          ),
+        ],
+        conditions: ["A", "B", "C"],
+        model,
+        outputRoot: path.join(root, "runs"),
+        runId: "run-preflight-failed",
+        forbiddenRoots: [path.join(root, "knowledge")],
+        runnerRevision: "b".repeat(40),
+        modelDescription: "fake",
+        currentRules: ["Repository rules take priority."],
+        routerContract: "Choose one primary method.",
+        methodContracts: {
+          decision: "Context, options, decision, consequences.",
+          experiment: "Hypothesis, setup, measures, stop rule.",
+          incident: "Impact, timeline, cause, prevention.",
+          report: "State, evidence, risk, next action.",
+        },
+      }),
+    ).rejects.toThrow(/^The private evaluation prompt preflight failed\.$/);
+
+    expect(modelCalls).toBe(0);
+    const failure = JSON.parse(
+      await readFile(
+        path.join(
+          root,
+          "runs",
+          "run-preflight-failed",
+          "failure.json",
+        ),
+        "utf8",
+      ),
+    );
+    expect(failure).toMatchObject({
+      runId: "run-preflight-failed",
+      caseId: "DOC-001",
+      condition: "B",
+      stage: "routing-prompt-preflight",
+      errorCode: "WITHHELD_PROMPT_OVERLAP",
+      rawModel: null,
+      rawModelSha256: null,
+    });
+  });
 });
 
 function manifest(): DocumentationEvaluationManifest {

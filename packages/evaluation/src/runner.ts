@@ -53,6 +53,31 @@ export interface PrivateDocumentationRunOptions {
   methodContracts: Partial<Record<DocumentationMethod, string>>;
 }
 
+export type PrivateDocumentationPromptPreflightOptions = Pick<
+  PrivateDocumentationRunOptions,
+  | "manifest"
+  | "records"
+  | "conditions"
+  | "currentRules"
+  | "routerContract"
+  | "methodContracts"
+>;
+
+export type DocumentationPromptPreflightErrorCode =
+  | "WITHHELD_PROMPT_OVERLAP"
+  | "UNSAFE_ROUTING_PROMPT";
+
+export class DocumentationPromptPreflightError extends Error {
+  constructor(
+    readonly code: DocumentationPromptPreflightErrorCode,
+    readonly caseId: string,
+    readonly condition: EvaluationCondition,
+  ) {
+    super("The private evaluation prompt preflight failed.");
+    this.name = "DocumentationPromptPreflightError";
+  }
+}
+
 const DOCUMENTATION_METHODS = [
   "decision",
   "experiment",
@@ -99,6 +124,61 @@ const ARTIFACT_OUTPUT_SCHEMA = {
   },
 } as const satisfies EvaluationOutputSchema;
 
+export function preflightPrivateDocumentationPrompts(
+  options: PrivateDocumentationPromptPreflightOptions,
+): { routingPromptCount: number } {
+  assertCompleteEvaluationConditions(options.conditions);
+  const cases = parseDocumentationCases(options.manifest);
+  let routingPromptCount = 0;
+
+  for (const testCase of cases) {
+    const eligible = buildEligibleRecordSet(options.records, {
+      suiteId: options.manifest.suiteId,
+      caseId: testCase.input.id,
+      sourceRecords: testCase.input.sourceRecords,
+      excludedEvidenceIds: testCase.input.excludedEvidenceIds,
+    });
+    const relevant = eligible.index.search(testCase.input.taskInput, {}, 5);
+    const contextRecords = relevant.map(toContextRecord);
+    const withheldValues = [
+      ...testCase.rubric.requiredElements,
+      ...testCase.rubric.forbiddenArtifacts,
+      ...testCase.rubric.ambiguities,
+    ];
+
+    for (const condition of options.conditions) {
+      try {
+        const routingPrompt = buildRoutingPrompt({
+          condition,
+          taskInput: testCase.input.taskInput,
+          ...(condition === "B" ? { contextRecords } : {}),
+          ...(condition === "C"
+            ? {
+                currentRules: options.currentRules,
+                routerContract: options.routerContract,
+                methodSummaries: methodSummaries(options.methodContracts),
+              }
+            : {}),
+        });
+        assertWithheldValuesAbsent(routingPrompt, withheldValues);
+      } catch (error) {
+        throw new DocumentationPromptPreflightError(
+          error instanceof Error &&
+            error.message ===
+              "Withheld evaluation material entered a model prompt."
+            ? "WITHHELD_PROMPT_OVERLAP"
+            : "UNSAFE_ROUTING_PROMPT",
+          testCase.input.id,
+          condition,
+        );
+      }
+      routingPromptCount += 1;
+    }
+  }
+
+  return { routingPromptCount };
+}
+
 export async function runPrivateDocumentationEvaluation(
   options: PrivateDocumentationRunOptions,
 ): Promise<{
@@ -134,6 +214,23 @@ export async function runPrivateDocumentationEvaluation(
     caseIds: cases.map((item) => item.input.id),
     startedAt,
   });
+
+  try {
+    preflightPrivateDocumentationPrompts(options);
+  } catch (error) {
+    if (error instanceof DocumentationPromptPreflightError) {
+      await writeFailure({
+        store,
+        runId: options.runId,
+        caseId: error.caseId,
+        condition: error.condition,
+        stage: "routing-prompt-preflight",
+        errorCode: error.code,
+        rawModel: null,
+      });
+    }
+    throw new Error("The private evaluation prompt preflight failed.");
+  }
 
   const evaluations: Array<Record<string, unknown> & {
     caseId: string;
