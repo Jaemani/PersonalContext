@@ -63,6 +63,7 @@ export async function findBundledPlaybook(): Promise<string | null> {
 
 export * from "./doctor.js";
 export * from "./config.js";
+export * from "./context.js";
 export * from "./evaluate.js";
 export * from "./index.js";
 export * from "./markdown.js";

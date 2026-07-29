@@ -35,6 +35,10 @@ try {
   if (!npmCli) throw new Error("npm_execpath is unavailable.");
   const packed = await run(process.execPath, [npmCli, "pack", "--json", "--ignore-scripts", "--pack-destination", temporaryRoot], process.cwd(), environment);
   const report = parseJsonArray(packed, "npm pack");
+  assert.ok(
+    report[0]?.files?.some((file) => file.path === "docs/CONTEXT_DELIVERY.md"),
+    "the package must include the context-delivery documentation linked from README",
+  );
   const archive = path.join(temporaryRoot, report[0]?.filename ?? "");
   await access(archive);
 

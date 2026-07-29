@@ -14,11 +14,13 @@ guidance or specialized tools.
    boundaries, and existing work before choosing a method.
 2. Classify the task as implementation, diagnosis, architecture, experiment,
    review, or a mechanical edit.
-3. If Personal Context MCP tools are available, call
-   `get_playbook_for_task` with the concrete task. Retrieve at most three
-   entries.
-4. Search personal knowledge only when prior experience could materially change
-   the decision. Prefer records with repository and exact evidence.
+3. If personal precedent or workflow guidance could materially change the
+   decision and Personal Context MCP tools are available, call
+   `get_context_for_task` once with the concrete task and repository identity.
+   Skip retrieval for routine mechanical work.
+4. Start with the bounded Context Pack. Call `trace_evidence` only for records
+   that materially support a decision or factual claim; do not broaden the
+   search merely to improve wording.
 5. Choose ceremony in proportion to failure cost, uncertainty, and
    reversibility. Do not create a plan, ADR, or report for a trivial edit.
 6. Execute the task using the repository's existing patterns and tools.

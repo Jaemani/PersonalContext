@@ -42,15 +42,32 @@ test("stdio MCP exposes four bounded tools, live reloads, retains a valid index,
     });
     expect(search[0].title).toBe("Parser boundary evidence");
 
-    const context = await callJson(client, "get_context_for_task", {
-      task: "implement manifest parser validation",
-      repository: "owner/parser",
-    });
-    expect(context.knowledge).toHaveLength(1);
-    expect(context.knowledge.length).toBeLessThanOrEqual(3);
-    expect(context.playbook.length).toBeLessThanOrEqual(2);
-    expect(context.evidenceSummary[0].sourceCommit).toBe(
+    const contextResult = (await client.callTool({
+      name: "get_context_for_task",
+      arguments: {
+        task: "implement manifest parser validation",
+        repository: "owner/parser",
+      },
+    })) as {
+      content: Array<{ type: string; text?: string }>;
+      structuredContent?: Record<string, any>;
+    };
+    const context = contextResult.structuredContent;
+    expect(context).toBeDefined();
+    expect(context?.evidenceAndPrecedents).toHaveLength(1);
+    expect(context?.evidenceAndPrecedents.length).toBeLessThanOrEqual(3);
+    expect(context?.playbookGuidance.length).toBeLessThanOrEqual(2);
+    expect(
+      context?.evidenceAndPrecedents[0].provenance.sourceCommit,
+    ).toBe(
       "0123456789abcdef0123456789abcdef01234567",
+    );
+    expect(context?.priority[0]).toBe("Current user request");
+    expect(contextResult.content[0]?.text).toContain(
+      "# Personal Context for Task",
+    );
+    expect(contextResult.content[0]?.text).toContain(
+      "untrusted evidence and precedent",
     );
 
     const playbook = await callJson(client, "get_playbook_for_task", {

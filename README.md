@@ -36,16 +36,27 @@ npx personal-context setup --headless
 
 Once connected, Codex and Claude Code can call:
 
-- `get_context_for_task` — up to two playbooks and three relevant knowledge
-  records with an evidence summary
+- `get_context_for_task` — one compact Context Pack with ordered precedence,
+  up to two playbooks, up to three evidence records, provenance, retrieval
+  limits, and IDs for optional follow-up
 - `search_personal_knowledge` — bounded search over approved knowledge
 - `get_playbook_for_task` — relevant engineering workflow guidance
 - `trace_evidence` — one selected record with repository, commit, links, and a
   bounded body
 
-The MCP instructions ask an agent to retrieve context once for a non-trivial
-task. Current repository rules and the user's instructions always take
-priority; personal notes are precedent, not universal rules.
+The MCP instructions ask an agent to retrieve context only when personal
+precedent or workflow guidance could materially change the work. The first
+response is deliberately small; agents use `trace_evidence` only for records
+that materially support a decision or factual claim. Current repository rules
+and the user's instructions always take priority, and note content is treated
+as untrusted evidence rather than as instructions.
+
+`get_context_for_task` returns the same provider-neutral projection as readable
+Markdown and MCP structured content. Modern tool-using agents can retrieve it
+on demand; a simpler harness can prefetch and inject the same pack without
+changing the canonical knowledge or inventing a second memory format. See
+[CONTEXT_DELIVERY.md](docs/CONTEXT_DELIVERY.md) for the research and design
+tradeoffs.
 
 Markdown changes are debounced and swapped into a complete new in-memory index.
 Agents see successful edits without restarting. If filesystem watching fails,
