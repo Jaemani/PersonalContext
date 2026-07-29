@@ -3,7 +3,10 @@ import {
   parseDocumentationCases,
   parseRoutingProposal,
 } from "./documentation-cases.js";
-import { buildEligibleRecordSet } from "./eligible-records.js";
+import {
+  assertEligibleRecordSelection,
+  buildEligibleRecordSet,
+} from "./eligible-records.js";
 import {
   createBlindedHumanReviewArtifacts,
   hashPrivateJson,
@@ -16,7 +19,6 @@ import {
 } from "./model-adapter.js";
 import {
   assertNoRawSecret,
-  assertWithheldValuesAbsent,
   buildArtifactPrompt,
   buildRoutingPrompt,
   type EvaluationCondition,
@@ -64,7 +66,7 @@ export type PrivateDocumentationPromptPreflightOptions = Pick<
 >;
 
 export type DocumentationPromptPreflightErrorCode =
-  | "WITHHELD_PROMPT_OVERLAP"
+  | "DISALLOWED_PROMPT_SOURCE"
   | "UNSAFE_ROUTING_PROMPT";
 
 export class DocumentationPromptPreflightError extends Error {
@@ -85,6 +87,7 @@ const DOCUMENTATION_METHODS = [
   "report",
   "none",
 ] as const;
+const PROMPT_DATAFLOW_POLICY = "provenance-v1";
 
 const ROUTING_OUTPUT_SCHEMA = {
   type: "object",
@@ -126,7 +129,7 @@ const ARTIFACT_OUTPUT_SCHEMA = {
 
 export function preflightPrivateDocumentationPrompts(
   options: PrivateDocumentationPromptPreflightOptions,
-): { routingPromptCount: number } {
+): { routingPromptCount: number; promptDataflowPolicy: string } {
   assertCompleteEvaluationConditions(options.conditions);
   const cases = parseDocumentationCases(options.manifest);
   let routingPromptCount = 0;
@@ -140,15 +143,19 @@ export function preflightPrivateDocumentationPrompts(
     });
     const relevant = eligible.index.search(testCase.input.taskInput, {}, 5);
     const contextRecords = relevant.map(toContextRecord);
-    const withheldValues = [
-      ...testCase.rubric.requiredElements,
-      ...testCase.rubric.forbiddenArtifacts,
-      ...testCase.rubric.ambiguities,
-    ];
+    const precedents = contextRecords.slice(0, 2);
 
     for (const condition of options.conditions) {
       try {
-        const routingPrompt = buildRoutingPrompt({
+        assertEligibleRecordSelection(
+          condition === "B"
+            ? contextRecords.map((record) => record.id)
+            : condition === "C"
+              ? precedents.map((record) => record.id)
+              : [],
+          eligible,
+        );
+        buildRoutingPrompt({
           condition,
           taskInput: testCase.input.taskInput,
           ...(condition === "B" ? { contextRecords } : {}),
@@ -160,13 +167,12 @@ export function preflightPrivateDocumentationPrompts(
               }
             : {}),
         });
-        assertWithheldValuesAbsent(routingPrompt, withheldValues);
       } catch (error) {
         throw new DocumentationPromptPreflightError(
           error instanceof Error &&
             error.message ===
-              "Withheld evaluation material entered a model prompt."
-            ? "WITHHELD_PROMPT_OVERLAP"
+              "Disallowed evaluation record entered prompt dataflow."
+            ? "DISALLOWED_PROMPT_SOURCE"
             : "UNSAFE_ROUTING_PROMPT",
           testCase.input.id,
           condition,
@@ -176,7 +182,7 @@ export function preflightPrivateDocumentationPrompts(
     }
   }
 
-  return { routingPromptCount };
+  return { routingPromptCount, promptDataflowPolicy: PROMPT_DATAFLOW_POLICY };
 }
 
 export async function runPrivateDocumentationEvaluation(
@@ -205,6 +211,7 @@ export async function runPrivateDocumentationEvaluation(
     runnerRevision,
     knowledgeSnapshotSha256,
     model: options.modelDescription,
+    promptDataflowPolicy: PROMPT_DATAFLOW_POLICY,
     runtime: {
       node: process.version,
       platform: process.platform,
@@ -250,11 +257,16 @@ export async function runPrivateDocumentationEvaluation(
     const precedents = relevant.slice(0, 2).map(toContextRecord);
 
     for (const condition of options.conditions) {
-      const withheldValues = [
-        ...testCase.rubric.requiredElements,
-        ...testCase.rubric.forbiddenArtifacts,
-        ...testCase.rubric.ambiguities,
-      ];
+      const selectedContextRecords =
+        condition === "B"
+          ? contextRecords
+          : condition === "C"
+            ? precedents
+            : [];
+      assertEligibleRecordSelection(
+        selectedContextRecords.map((record) => record.id),
+        eligible,
+      );
       const routingPrompt = buildRoutingPrompt({
         condition,
         taskInput: testCase.input.taskInput,
@@ -267,7 +279,6 @@ export async function runPrivateDocumentationEvaluation(
             }
           : {}),
       });
-      assertWithheldValuesAbsent(routingPrompt, withheldValues);
       const rawRouting = await completeModelJson({
         model: options.model,
         prompt: routingPrompt,
@@ -312,7 +323,6 @@ export async function runPrivateDocumentationEvaluation(
           ? { selectedMethodContract, precedents }
           : {}),
       });
-      assertWithheldValuesAbsent(artifactPrompt, withheldValues);
       const rawArtifact = await completeModelJson({
         model: options.model,
         prompt: artifactPrompt,
@@ -357,12 +367,8 @@ export async function runPrivateDocumentationEvaluation(
           artifact: rawArtifact,
         },
         context: {
-          recordIds:
-            condition === "B"
-              ? contextRecords.map((record) => record.id)
-              : condition === "C"
-                ? precedents.map((record) => record.id)
-                : [],
+          promptDataflowPolicy: PROMPT_DATAFLOW_POLICY,
+          recordIds: selectedContextRecords.map((record) => record.id),
           eligibleRecordCount: eligible.recordIds.length,
           excludedRecordIds: eligible.excludedRecordIds,
         },

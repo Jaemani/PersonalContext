@@ -79,7 +79,8 @@ The runner fails closed when:
 - the manifest hash differs from its frozen value;
 - production indexing is not explicitly disabled;
 - a target record cannot be excluded before index construction;
-- withheld rubric material enters a prompt;
+- a withheld rubric object, excluded target record, or audit record enters the
+  prompt dataflow;
 - a raw secret pattern appears in a prompt or model result;
 - the run output overlaps the knowledge root or source repository;
 - an existing run output root is not an owner-only `700` directory;
@@ -93,6 +94,14 @@ artifact responses are constrained with explicit Codex output schemas. If a
 command or response contract fails, the immutable private attempt records a
 `failure.json` envelope and any available raw model response before stopping;
 failed output is never copied to Git or the production knowledge root.
+
+Leakage is determined by provenance, not by literal string similarity. A
+rubric phrase may independently occur in an eligible user-authored record
+because conveying that knowledge is the product's purpose. The runner therefore
+audits every retrieved record ID against the per-case eligible and excluded
+sets, keeps the rubric object out of prompt-builder inputs, and records the
+`provenance-v1` prompt-dataflow policy in private run metadata. Exact overlap
+with eligible context is allowed; content from a disallowed source is not.
 
 The current runner implements the Documentation Router A/B/C contract. The
 Operational Context suite has a separate condition meaning and is validation

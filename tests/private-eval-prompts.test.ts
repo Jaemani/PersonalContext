@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertWithheldValuesAbsent,
   buildArtifactPrompt,
   buildRoutingPrompt,
 } from "../packages/evaluation/src/prompts.js";
@@ -22,7 +21,7 @@ describe("private evaluation prompts", () => {
     expect(b).toContain("eligible evidence");
   });
 
-  it("gives condition C the router summaries but not withheld rubric data", () => {
+  it("gives condition C only the explicitly supplied routing material", () => {
     const prompt = buildRoutingPrompt({
       condition: "C",
       taskInput: "Choose an appropriate durable artifact.",
@@ -33,15 +32,7 @@ describe("private evaluation prompts", () => {
 
     expect(prompt).toContain("Repository rules override");
     expect(prompt).toContain("Return none");
-    expect(() =>
-      assertWithheldValuesAbsent(prompt, ["unique-hidden-rubric-value"]),
-    ).not.toThrow();
-    expect(() =>
-      assertWithheldValuesAbsent(
-        `${prompt}\nunique-hidden-rubric-value`,
-        ["unique-hidden-rubric-value"],
-      ),
-    ).toThrow(/withheld evaluation material/i);
+    expect(prompt).not.toContain("unique-hidden-rubric-value");
   });
 
   it("uses the model-selected method for condition C artifact generation", () => {

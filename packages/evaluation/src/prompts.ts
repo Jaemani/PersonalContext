@@ -102,19 +102,6 @@ export function buildArtifactPrompt(options: ArtifactPromptOptions): string {
   return boundedText(parts.join("\n\n"), 32_000);
 }
 
-export function assertWithheldValuesAbsent(
-  prompt: string,
-  withheldValues: string[],
-): void {
-  const normalizedPrompt = prompt.toLowerCase();
-  for (const value of withheldValues) {
-    const normalized = value.trim().toLowerCase();
-    if (normalized.length >= 8 && normalizedPrompt.includes(normalized)) {
-      throw new Error("Withheld evaluation material entered a model prompt.");
-    }
-  }
-}
-
 export function assertNoRawSecret(value: string): void {
   const patterns = [
     /\bghp_[A-Za-z0-9]{20,}\b/,

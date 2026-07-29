@@ -213,13 +213,23 @@ describe("private documentation evaluation runner", () => {
     expect(failure.rawModelSha256).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("rejects deterministic rubric overlap before the first model call", async () => {
+  it("allows rubric text overlap when it comes from eligible user context", async () => {
     const root = await temp();
+    const prompts: string[] = [];
     let modelCalls = 0;
+    const responses = [
+      routing("decision"),
+      artifact("decision", "ordinary output"),
+      routing("decision"),
+      artifact("decision", "ordinary output"),
+      routing("decision"),
+      artifact("decision", "ordinary output"),
+    ];
     const model = {
-      async completeJson() {
+      async completeJson(prompt: string) {
         modelCalls += 1;
-        return routing("decision");
+        prompts.push(prompt);
+        return responses.shift();
       },
     };
     const overlappingManifest = manifest();
@@ -251,7 +261,7 @@ describe("private documentation evaluation runner", () => {
         conditions: ["A", "B", "C"],
         model,
         outputRoot: path.join(root, "runs"),
-        runId: "run-preflight-failed",
+        runId: "run-provenance-overlap",
         forbiddenRoots: [path.join(root, "knowledge")],
         runnerRevision: "b".repeat(40),
         modelDescription: "fake",
@@ -264,29 +274,18 @@ describe("private documentation evaluation runner", () => {
           report: "State, evidence, risk, next action.",
         },
       }),
-    ).rejects.toThrow(/^The private evaluation prompt preflight failed\.$/);
+    ).resolves.toMatchObject({ caseCount: 1 });
 
-    expect(modelCalls).toBe(0);
-    const failure = JSON.parse(
+    expect(modelCalls).toBe(6);
+    expect(prompts[0]).not.toContain("exact withheld overlap");
+    expect(prompts[2]).toContain("exact withheld overlap");
+    const metadata = JSON.parse(
       await readFile(
-        path.join(
-          root,
-          "runs",
-          "run-preflight-failed",
-          "failure.json",
-        ),
+        path.join(root, "runs", "run-provenance-overlap", "metadata-start.json"),
         "utf8",
       ),
     );
-    expect(failure).toMatchObject({
-      runId: "run-preflight-failed",
-      caseId: "DOC-001",
-      condition: "B",
-      stage: "routing-prompt-preflight",
-      errorCode: "WITHHELD_PROMPT_OVERLAP",
-      rawModel: null,
-      rawModelSha256: null,
-    });
+    expect(metadata.promptDataflowPolicy).toBe("provenance-v1");
   });
 });
 

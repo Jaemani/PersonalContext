@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { KnowledgeRecord } from "../packages/core/src/types.js";
-import { buildEligibleRecordSet } from "../packages/evaluation/src/eligible-records.js";
+import {
+  assertEligibleRecordSelection,
+  buildEligibleRecordSet,
+} from "../packages/evaluation/src/eligible-records.js";
 
 describe("private evaluation eligible records", () => {
   it("removes target evidence before constructing the search index", () => {
@@ -61,6 +64,23 @@ describe("private evaluation eligible records", () => {
     });
 
     expect(eligible.recordIds).toEqual(["knowledge:support.md"]);
+  });
+
+  it("rejects excluded or unknown records at the prompt dataflow boundary", () => {
+    const eligible = {
+      recordIds: ["knowledge:support.md"],
+      excludedRecordIds: ["knowledge:target.md"],
+    };
+
+    expect(() =>
+      assertEligibleRecordSelection(["knowledge:support.md"], eligible),
+    ).not.toThrow();
+    expect(() =>
+      assertEligibleRecordSelection(["knowledge:target.md"], eligible),
+    ).toThrow(/disallowed evaluation record/i);
+    expect(() =>
+      assertEligibleRecordSelection(["knowledge:unknown.md"], eligible),
+    ).toThrow(/disallowed evaluation record/i);
   });
 });
 

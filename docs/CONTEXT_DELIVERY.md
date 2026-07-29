@@ -157,6 +157,11 @@ burden, unnecessary context, and whether the result is worth keeping. Keep a
 development set separate from the frozen decision gate so the Context Pack is
 not tuned to private expected answers.
 
+Evaluation leakage is also a provenance question. Text shared by a private
+rubric and an independently authored eligible note is not sufficient evidence
+of leakage. The gate must instead prove that rubric objects, excluded target
+records, and audit records have no path into model input.
+
 ## Sources
 
 - OpenAI, [Codex best practices](https://learn.chatgpt.com/guides/best-practices)

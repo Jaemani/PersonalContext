@@ -16,6 +16,21 @@ export interface EligibleRecordSet {
   excludedRecordIds: string[];
 }
 
+export function assertEligibleRecordSelection(
+  selectedRecordIds: string[],
+  eligible: Pick<EligibleRecordSet, "recordIds" | "excludedRecordIds">,
+): void {
+  const allowed = new Set(eligible.recordIds);
+  const excluded = new Set(eligible.excludedRecordIds);
+  if (
+    selectedRecordIds.some(
+      (recordId) => !allowed.has(recordId) || excluded.has(recordId),
+    )
+  ) {
+    throw new Error("Disallowed evaluation record entered prompt dataflow.");
+  }
+}
+
 export function buildEligibleRecordSet(
   records: KnowledgeRecord[],
   options: EligibleRecordOptions,

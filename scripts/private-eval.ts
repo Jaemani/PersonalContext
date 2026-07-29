@@ -61,6 +61,7 @@ async function main(): Promise<void> {
   let routerContract = "";
   let methodContracts: Partial<Record<DocumentationMethod, string>> = {};
   let currentRules: string[] = [];
+  let promptDataflowPolicy: string | null = null;
   if (loaded.manifest.suiteId === DOCUMENTATION_EVALUATION_SUITE_ID) {
     records = await readKnowledgeStore(storePath, "knowledge");
     knowledgeSnapshotSha256 = hashKnowledgeSnapshot(records);
@@ -75,14 +76,14 @@ async function main(): Promise<void> {
       });
       exclusionCount += eligible.excludedRecordIds.length;
     }
-    preflightPrivateDocumentationPrompts({
+    ({ promptDataflowPolicy } = preflightPrivateDocumentationPrompts({
       manifest: loaded.manifest,
       records,
       conditions,
       currentRules,
       routerContract,
       methodContracts,
-    });
+    }));
   }
   if (args.includes("--validate-only")) {
     process.stdout.write(
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
         modelPinned: Boolean(modelName),
         reasoningEffortPinned: Boolean(reasoningEffort),
         runnerRevisionPinned: true,
+        promptDataflowPolicy,
         knowledgeSnapshotSha256,
         outputIsolated: true,
         valid: true,
