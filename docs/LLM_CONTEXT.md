@@ -50,8 +50,8 @@ Obsidian APIs.
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/core` | Markdown/frontmatter/wikilink parsing, validation, lexical retrieval, store resolution, live reload |
-| `packages/mcp` | four read-only MCP tools, server instructions, response bounds |
+| `packages/core` | Markdown/frontmatter/wikilink parsing, validation, lexical retrieval, store resolution, live reload, and the provider-neutral Context Pack builder/Markdown renderer in `src/context.ts` |
+| `packages/mcp` | four read-only MCP tools, including `get_context_for_task` as a Markdown + `structuredContent` Context Pack delivery surface; server instructions and response bounds |
 | `packages/agents` | official Codex and Claude Code CLI adapters with inspect/plan/apply/verify/rollback |
 | `packages/setup` | candidate discovery, source validation, managed-runtime installation, client orchestration, loopback server |
 | `packages/setup-ui` | one-time local setup wizard and its visual states |
@@ -93,9 +93,10 @@ resolve store: --store -> PERSONAL_CONTEXT_STORE -> user config
   -> retain previous valid index on a bad reload
 ```
 
-`get_context_for_task` is the normal entry point: at most two playbooks and
-three knowledge records. Use `trace_evidence` before relying on a selected
-record's details.
+`get_context_for_task` is the normal entry point: it delivers the same bounded
+Context Pack as readable Markdown and MCP `structuredContent`, with at most two
+playbooks and three evidence or precedent records. Use `trace_evidence` before
+relying on a selected record's full details.
 
 ## Change routing
 
