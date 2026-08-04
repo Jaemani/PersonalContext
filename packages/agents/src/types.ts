@@ -18,6 +18,8 @@ export interface ExistingAgentConnection {
   args: string[];
   raw: string;
   scope?: string;
+  /** False when a CLI's human output cannot be parsed safely enough to restore. */
+  rollbackSafe?: boolean;
 }
 
 export type AdapterPlanAction = "noop" | "add" | "replace";

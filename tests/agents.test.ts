@@ -107,6 +107,71 @@ describe("official agent adapters", () => {
     expect(fake.current()).toMatchObject(previous);
     expect(fake.calls.some((call) => call.args.includes("--scope"))).toBe(true);
   });
+
+  it("recognizes Claude's unquoted human output when the runtime path contains spaces", async () => {
+    const fake = fakeRunner("claude");
+    const connection = {
+      nodePath: "/usr/local/bin/node",
+      runtimePath:
+        "/Users/person/Library/Application Support/personal-context/runtime/current/personal-context.mjs",
+    };
+    fake.setCurrent({
+      command: connection.nodePath,
+      args: [connection.runtimePath, "mcp"],
+      raw: "",
+      scope: "user",
+    });
+    const adapter = claudeAdapter(fake.runner);
+
+    const plan = await adapter.plan(connection);
+
+    expect(plan.action).toBe("noop");
+    expect(plan.canRollback).toBe(true);
+    expect((await adapter.verify(connection)).exitCode).toBe(0);
+  });
+
+  it("does not replace an unrelated Claude entry with ambiguous unquoted arguments", async () => {
+    const fake = fakeRunner("claude");
+    fake.setCurrent({
+      command: "/usr/local/bin/node",
+      args: ["/Users/person/Library/Application Support/other/runtime.mjs", "mcp"],
+      raw: "",
+      scope: "user",
+    });
+    const adapter = claudeAdapter(fake.runner);
+    const connection = {
+      nodePath: "/usr/local/bin/node",
+      runtimePath: "/managed/personal-context.mjs",
+    };
+
+    const plan = await adapter.plan(connection);
+
+    expect(plan.action).toBe("replace");
+    expect(plan.canRollback).toBe(false);
+    expect(
+      (await adapter.apply(connection, plan, { allowReplace: true })).exitCode,
+    ).toBe(2);
+    expect(fake.current()?.args[0]).toContain("Application Support");
+  });
+
+  it("does not treat another two-token Claude command as restorable", async () => {
+    const fake = fakeRunner("claude");
+    fake.setCurrent({
+      command: "/usr/local/bin/node",
+      args: ["/other/runtime.mjs", "--stdio"],
+      raw: "",
+      scope: "user",
+    });
+    const adapter = claudeAdapter(fake.runner);
+
+    const plan = await adapter.plan({
+      nodePath: "/usr/local/bin/node",
+      runtimePath: "/managed/personal-context.mjs",
+    });
+
+    expect(plan.action).toBe("replace");
+    expect(plan.canRollback).toBe(false);
+  });
 });
 
 function result(

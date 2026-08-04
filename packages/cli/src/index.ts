@@ -12,6 +12,7 @@ import {
   readKnowledgeStore,
   resolveStorePath,
 } from "../../core/src/runtime.js";
+import { PERSONAL_CONTEXT_VERSION } from "../../core/src/version.js";
 import { startPersonalContextServer } from "../../mcp/src/server.js";
 import {
   managedRuntimeRoot,
@@ -23,7 +24,7 @@ import {
   type SetupToolId,
 } from "../../setup/src/index.js";
 
-const PACKAGE_VERSION = "0.1.0";
+const PACKAGE_VERSION = PERSONAL_CONTEXT_VERSION;
 const args = process.argv.slice(2);
 const command = args[0];
 
