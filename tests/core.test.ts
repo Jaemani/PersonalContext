@@ -17,7 +17,7 @@ describe("portable knowledge contract", () => {
       (record) => record.title === "Fail closed at the parser boundary",
     );
 
-    expect(records).toHaveLength(6);
+    expect(records).toHaveLength(7);
     expect(experience?.sourceRepository).toBe("owner/sample");
     expect(experience?.sourceCommit).toBe(
       "0123456789abcdef0123456789abcdef01234567",
