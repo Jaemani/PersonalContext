@@ -14,5 +14,29 @@
       "Separate evidence from verdict"
     ],
     "limit": 3
+  },
+  {
+    "schemaVersion": 2,
+    "id": "current-rule-lifecycle",
+    "query": "What is the current context boundary rule?",
+    "intent": "current-rule",
+    "limit": 1,
+    "expected": {
+      "requiredEvidenceIds": ["fixture:context-boundary-active"],
+      "forbiddenEvidenceIds": ["fixture:context-boundary-proposed"],
+      "requiredStatuses": ["active", "current"]
+    },
+    "privacy": "public-fixture"
+  },
+  {
+    "schemaVersion": 2,
+    "id": "historical-lifecycle",
+    "query": "What was the previous context boundary rule?",
+    "intent": "temporal",
+    "limit": 3,
+    "expected": {
+      "requiredEvidenceIds": ["fixture:context-boundary-superseded"]
+    },
+    "privacy": "public-fixture"
   }
 ]

@@ -83,6 +83,7 @@ async function readKnowledgeRecord(
     links: wikiLinks(parsed.content),
     evidenceUrls: evidenceUrls(parsed.content),
     body: parsed.content.trim(),
+    evidenceId: scalar(parsed.data.evidence_id) ?? undefined,
   };
 }
 

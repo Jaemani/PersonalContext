@@ -17,7 +17,7 @@ describe("portable knowledge contract", () => {
       (record) => record.title === "Fail closed at the parser boundary",
     );
 
-    expect(records).toHaveLength(3);
+    expect(records).toHaveLength(6);
     expect(experience?.sourceRepository).toBe("owner/sample");
     expect(experience?.sourceCommit).toBe(
       "0123456789abcdef0123456789abcdef01234567",
@@ -37,6 +37,20 @@ describe("portable knowledge contract", () => {
 
     expect(hits[0]?.title).toBe("Fail closed at the parser boundary");
     expect(hits[0]?.sourceRepository).toBe("owner/sample");
+  });
+
+  it("uses lifecycle only for current-rule queries and keeps history searchable", async () => {
+    const index = new PersonalKnowledgeIndex(
+      await readKnowledgeStore(fixtureRoot),
+    );
+
+    const current = index.search("현재 context boundary rule", {}, 1);
+    const historical = index.search("previous context boundary rule", {}, 3);
+
+    expect(current[0]?.evidenceId).toBe("fixture:context-boundary-active");
+    expect(historical.map((hit) => hit.evidenceId)).toContain(
+      "fixture:context-boundary-superseded",
+    );
   });
 
   it("reports a valid fixture store", async () => {
