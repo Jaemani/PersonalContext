@@ -190,7 +190,11 @@ function currentRuleLifecycleWeight(status: string | null): number {
   if (!normalized) return 1;
   if (["active", "current"].includes(normalized)) return 2;
   if (["proposed", "candidate", "draft"].includes(normalized)) return 0.55;
-  if (["superseded", "deprecated", "archived", "retired"].includes(normalized)) {
+  if (
+    ["historical", "superseded", "deprecated", "archived", "retired"].includes(
+      normalized,
+    )
+  ) {
     return 0.3;
   }
   return 1;
