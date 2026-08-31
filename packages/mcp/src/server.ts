@@ -7,6 +7,7 @@ import {
   renderTaskContextPack,
   type KnowledgeRecord,
 } from "../../core/src/runtime.js";
+import { PERSONAL_CONTEXT_VERSION } from "../../core/src/version.js";
 
 const MAX_EVIDENCE_URLS = 20;
 const MAX_LINKS = 30;
@@ -24,7 +25,7 @@ export async function startPersonalContextServer(
   const runtime = await createReloadingKnowledgeRuntime(options);
   const server = new McpServer({
     name: "personal-context",
-    version: "0.1.0",
+    version: PERSONAL_CONTEXT_VERSION,
   }, { instructions: PERSONAL_CONTEXT_SERVER_INSTRUCTIONS });
 
   server.registerTool(

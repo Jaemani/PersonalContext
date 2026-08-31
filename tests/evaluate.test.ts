@@ -24,5 +24,9 @@ describe("retrieval evaluation", () => {
 
     expect(report.hitRate).toBe(1);
     expect(report.cases.every((testCase) => testCase.passed)).toBe(true);
+    expect(report.meanReciprocalRank).toBe(1);
+    expect(report.meanRecallAtK).toBe(1);
+    expect(report.lifecycleMismatchCount).toBe(0);
+    expect(report.provenanceIncompleteCount).toBe(0);
   });
 });

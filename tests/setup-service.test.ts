@@ -52,7 +52,7 @@ describe("setup service", () => {
 
     const detection = await service.detect();
     expect(detection.sources[0]).toMatchObject({
-      noteCount: 3,
+      noteCount: 7,
       validation: "valid",
     });
     const result = await service.connect({

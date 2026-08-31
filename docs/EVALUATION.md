@@ -24,6 +24,12 @@ Track:
 - returned context size
 - cold start and warm query latency
 
+RetrievalCase v2 uses stable `evidence_id` values rather than titles and records
+the query intent, required and forbidden evidence, lifecycle expectations,
+reciprocal rank, recall@k, and provenance completeness. Current-rule cases must
+prefer `active` or `current` records; temporal cases keep historical and
+superseded records searchable.
+
 ## Task quality
 
 Compare real tasks with and without the personal engineering skill. Review:

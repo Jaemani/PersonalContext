@@ -17,7 +17,7 @@ describe("portable knowledge contract", () => {
       (record) => record.title === "Fail closed at the parser boundary",
     );
 
-    expect(records).toHaveLength(3);
+    expect(records).toHaveLength(7);
     expect(experience?.sourceRepository).toBe("owner/sample");
     expect(experience?.sourceCommit).toBe(
       "0123456789abcdef0123456789abcdef01234567",
@@ -37,6 +37,30 @@ describe("portable knowledge contract", () => {
 
     expect(hits[0]?.title).toBe("Fail closed at the parser boundary");
     expect(hits[0]?.sourceRepository).toBe("owner/sample");
+  });
+
+  it("prioritizes active records for current-rule queries without hiding history", () => {
+    const base = {
+      collection: "knowledge" as const,
+      root: "/fixture",
+      absolutePath: "/fixture/note.md",
+      type: "decision",
+      kind: null,
+      confidence: "high",
+      sourceRepository: "owner/repo",
+      sourceCommit: "0123456789abcdef0123456789abcdef01234567",
+      tags: ["boundary"],
+      links: [],
+      evidenceUrls: [],
+      body: "Context boundary rule for agent retrieval and safe application.",
+    };
+    const index = new PersonalKnowledgeIndex([
+      { ...base, id: "active", path: "active.md", title: "Context boundary", status: "active" },
+      { ...base, id: "historical", path: "historical.md", title: "Current context boundary rule", status: "superseded" },
+    ]);
+
+    expect(index.search("현재 current context boundary rule", {}, 1)[0]?.id).toBe("active");
+    expect(index.search("previous context boundary rule", {}, 3).map((hit) => hit.id)).toContain("historical");
   });
 
   it("reports a valid fixture store", async () => {

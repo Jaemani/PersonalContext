@@ -52,7 +52,7 @@ try {
   const status = JSON.parse(await run(executable, ["status", "--json"], temporaryRoot, environment));
   assert.equal(status.configured, true);
   assert.equal(status.source, "config");
-  assert.equal(status.runtimeVersion, "0.1.0");
+  assert.equal(status.runtimeVersion, "0.1.2");
   assert.deepEqual(status.clients.map((client) => client.status), ["connected", "connected"]);
 
   const hits = JSON.parse(await run(executable, ["query", "package smoke"], temporaryRoot, environment));

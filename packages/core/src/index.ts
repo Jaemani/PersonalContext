@@ -1,6 +1,7 @@
 import MiniSearch from "minisearch";
 import type {
   KnowledgeRecord,
+  RetrievalIntent,
   SearchFilters,
   SearchHit,
 } from "./types.js";
@@ -43,19 +44,27 @@ export class PersonalKnowledgeIndex {
     query: string,
     filters: SearchFilters = {},
     limit = 5,
+    intent?: RetrievalIntent,
   ): SearchHit[] {
     const normalizedQuery = query.trim();
     if (!normalizedQuery) return [];
 
     const results = this.searchIndex.search(normalizedQuery);
+    const currentRuleQuery = intent
+      ? intent === "current-rule"
+      : isCurrentRuleQuery(normalizedQuery);
     const hits: SearchHit[] = [];
     for (const result of results) {
       const record = this.recordsById.get(String(result.id));
       if (!record || !matchesFilters(record, filters)) continue;
-      hits.push(toSearchHit(record, result.score, normalizedQuery));
-      if (hits.length >= Math.max(1, Math.min(limit, 20))) break;
+      const score = currentRuleQuery
+        ? result.score * currentRuleLifecycleWeight(record.status)
+        : result.score;
+      hits.push(toSearchHit(record, score, normalizedQuery));
     }
-    return hits;
+    return hits
+      .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
+      .slice(0, Math.max(1, Math.min(limit, 20)));
   }
 
   get(identifier: string): KnowledgeRecord | null {
@@ -70,6 +79,49 @@ export class PersonalKnowledgeIndex {
       ) ?? null
     );
   }
+}
+
+function isCurrentRuleQuery(query: string): boolean {
+  const normalized = query.toLowerCase();
+  const historical = [
+    /\bhistor(?:y|ical)\b/,
+    /\bpast\b/,
+    /\bprevious\b/,
+    /\bold\b/,
+    /\bsuperseded\b/,
+    /\bdeprecated\b/,
+    /과거/u,
+    /이전/u,
+    /당시/u,
+    /변경\s*전/u,
+    /역사/u,
+  ];
+  if (historical.some((pattern) => pattern.test(normalized))) return false;
+  const current = [
+    /\bcurrent(?:ly)?\b/,
+    /\blatest\b/,
+    /\bactive\b/,
+    /\bnow\b/,
+    /\bpresent\b/,
+    /현재/u,
+    /지금/u,
+    /최신/u,
+    /현행/u,
+    /유효한/u,
+    /적용\s*중/u,
+  ];
+  return current.some((pattern) => pattern.test(normalized));
+}
+
+function currentRuleLifecycleWeight(status: string | null): number {
+  const normalized = status?.trim().toLowerCase();
+  if (!normalized) return 1;
+  if (["active", "current"].includes(normalized)) return 2;
+  if (["proposed", "candidate", "draft"].includes(normalized)) return 0.55;
+  if (["historical", "superseded", "deprecated", "archived", "retired"].includes(normalized)) {
+    return 0.3;
+  }
+  return 1;
 }
 
 function indexedRecord(record: KnowledgeRecord): IndexedRecord {
@@ -139,6 +191,7 @@ function toSearchHit(
     links: record.links.slice(0, MAX_SEARCH_LINKS),
     score,
     snippet: snippet(record.body, query),
+    evidenceId: record.evidenceId,
   };
 }
 

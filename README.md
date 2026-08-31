@@ -112,6 +112,10 @@ See [KNOWLEDGE_CONTRACT.md](docs/KNOWLEDGE_CONTRACT.md),
 
 ## Privacy and installation
 
+For implementation ownership, retrieval behavior, failure recovery, and release
+gates, see [LLM_CONTEXT.md](docs/LLM_CONTEXT.md). Dated handoffs are historical
+milestone snapshots.
+
 The setup UI is served once from a random loopback port and closes when setup is
 finished. Runtime MCP communication is local stdio. Configuration stores only a
 schema version, the chosen knowledge root, and its last validation time.

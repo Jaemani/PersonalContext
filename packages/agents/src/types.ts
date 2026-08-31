@@ -18,6 +18,8 @@ export interface ExistingAgentConnection {
   args: string[];
   raw: string;
   scope?: string;
+  /** False when human-readable CLI output cannot be restored without guessing. */
+  rollbackSafe?: boolean;
 }
 
 export type AdapterPlanAction = "noop" | "add" | "replace";

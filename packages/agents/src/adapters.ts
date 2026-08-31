@@ -56,9 +56,11 @@ class CliAdapter implements AgentAdapter {
     const previous =
       this.name === "codex"
         ? parseCodexConnection(inspection.stdout)
-        : parseClaudeConnection(inspection.stdout);
+        : parseClaudeConnection(inspection.stdout, desired);
     const supportedScope =
       this.name === "codex" || previous?.scope?.toLowerCase() === "user";
+    const rollbackSafe =
+      this.name === "codex" || previous?.rollbackSafe !== false;
     const same = previous
       ? sameConnection(previous, desired) && supportedScope
       : false;
@@ -66,7 +68,8 @@ class CliAdapter implements AgentAdapter {
       action: same ? "noop" : "replace",
       desired,
       previous,
-      canRollback: same || (previous !== null && supportedScope),
+      canRollback:
+        same || (previous !== null && supportedScope && rollbackSafe),
       inspection,
     };
   }
@@ -106,11 +109,12 @@ class CliAdapter implements AgentAdapter {
   async verify(connection: AgentConnection): Promise<CommandResult> {
     const result = await this.inspect();
     if (result.exitCode !== 0) return result;
+    const desired = desiredConnection(connection);
     const actual =
       this.name === "codex"
         ? parseCodexConnection(result.stdout)
-        : parseClaudeConnection(result.stdout);
-    return actual && sameConnection(actual, desiredConnection(connection))
+        : parseClaudeConnection(result.stdout, desired);
+    return actual && sameConnection(actual, desired)
       ? result
       : failure(
           result.command,
@@ -206,16 +210,30 @@ function parseCodexConnection(output: string): ExistingAgentConnection | null {
   }
 }
 
-function parseClaudeConnection(output: string): ExistingAgentConnection | null {
+function parseClaudeConnection(
+  output: string,
+  desired?: ExistingAgentConnection,
+): ExistingAgentConnection | null {
   const command = lineValue(output, "Command");
   const argsLine = lineValue(output, "Args");
   if (!command || argsLine === null) return null;
+  const desiredMatchesRaw =
+    desired !== undefined &&
+    path.resolve(command) === path.resolve(desired.command) &&
+    argsLine === desired.args.join(" ");
   return {
     command,
-    args: splitCommandLine(argsLine),
+    args: desiredMatchesRaw ? desired.args : splitCommandLine(argsLine),
     raw: output,
     scope: lineValue(output, "Scope")?.split(/\s+/)[0]?.toLowerCase(),
+    rollbackSafe: desiredMatchesRaw || safelyTokenizedClaudeArgs(argsLine),
   };
+}
+
+function safelyTokenizedClaudeArgs(value: string): boolean {
+  if (/['"]/.test(value)) return true;
+  const args = splitCommandLine(value);
+  return args.length === 2 && args[1] === "mcp";
 }
 
 function lineValue(output: string, label: string): string | null {
