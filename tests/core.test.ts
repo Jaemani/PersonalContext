@@ -39,28 +39,18 @@ describe("portable knowledge contract", () => {
     expect(hits[0]?.sourceRepository).toBe("owner/sample");
   });
 
-  it("prioritizes active records for current-rule queries without hiding history", () => {
-    const base = {
-      collection: "knowledge" as const,
-      root: "/fixture",
-      absolutePath: "/fixture/note.md",
-      type: "decision",
-      kind: null,
-      confidence: "high",
-      sourceRepository: "owner/repo",
-      sourceCommit: "0123456789abcdef0123456789abcdef01234567",
-      tags: ["boundary"],
-      links: [],
-      evidenceUrls: [],
-      body: "Context boundary rule for agent retrieval and safe application.",
-    };
-    const index = new PersonalKnowledgeIndex([
-      { ...base, id: "active", path: "active.md", title: "Context boundary", status: "active" },
-      { ...base, id: "historical", path: "historical.md", title: "Current context boundary rule", status: "superseded" },
-    ]);
+  it("uses lifecycle only for current-rule queries and keeps history searchable", async () => {
+    const index = new PersonalKnowledgeIndex(
+      await readKnowledgeStore(fixtureRoot),
+    );
 
-    expect(index.search("현재 current context boundary rule", {}, 1)[0]?.id).toBe("active");
-    expect(index.search("previous context boundary rule", {}, 3).map((hit) => hit.id)).toContain("historical");
+    const current = index.search("현재 context boundary rule", {}, 1);
+    const historical = index.search("previous context boundary rule", {}, 3);
+
+    expect(current[0]?.evidenceId).toBe("fixture:context-boundary-active");
+    expect(historical.map((hit) => hit.evidenceId)).toContain(
+      "fixture:context-boundary-superseded",
+    );
   });
 
   it("reports a valid fixture store", async () => {

@@ -221,9 +221,12 @@ function parseClaudeConnection(
     desired !== undefined &&
     path.resolve(command) === path.resolve(desired.command) &&
     argsLine === desired.args.join(" ");
+  const parsedArgs = desiredMatchesRaw
+    ? desired.args
+    : splitCommandLine(argsLine);
   return {
     command,
-    args: desiredMatchesRaw ? desired.args : splitCommandLine(argsLine),
+    args: parsedArgs,
     raw: output,
     scope: lineValue(output, "Scope")?.split(/\s+/)[0]?.toLowerCase(),
     rollbackSafe: desiredMatchesRaw || safelyTokenizedClaudeArgs(argsLine),
@@ -232,6 +235,10 @@ function parseClaudeConnection(
 
 function safelyTokenizedClaudeArgs(value: string): boolean {
   if (/['"]/.test(value)) return true;
+  // Claude's human-readable output leaves spaces unquoted. Only an exact
+  // two-token `<path-without-spaces> mcp` shape is unambiguous enough to
+  // restore. Anything else might have been a single path containing spaces,
+  // so replacement must fail closed rather than risk overwriting it.
   const args = splitCommandLine(value);
   return args.length === 2 && args[1] === "mcp";
 }

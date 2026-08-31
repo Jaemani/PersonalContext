@@ -1,5 +1,9 @@
 # Personal Context development guide
 
+For implementation work, read `docs/LLM_CONTEXT.md` after this file. Read
+`docs/EVALUATION.md` only when changing evaluation, and use dated handoff
+documents only when resuming their exact milestone.
+
 ## Product boundary
 
 Personal Context reads portable Markdown knowledge and serves bounded,
@@ -23,4 +27,8 @@ Run before committing:
 npm run check
 npm test
 npm run build
+npm run test:e2e
+npm run test:package
+npm audit --omit=dev --audit-level=high
+git diff --check
 ```

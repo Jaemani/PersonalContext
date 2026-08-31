@@ -31,14 +31,20 @@ export function evaluateRetrieval(
       const acceptableStatuses = new Set(
         (testCase.expected.requiredStatuses ?? []).map((status) => status.toLowerCase()),
       );
-      const requiredHits = hits.filter((hit) => required.includes(hit.evidenceId ?? hit.id));
-      const lifecycleMismatch = acceptableStatuses.size > 0 && requiredHits.some(
-        (hit) => !hit.status || !acceptableStatuses.has(hit.status.toLowerCase()),
+      const requiredHits = hits.filter((hit) =>
+        required.includes(hit.evidenceId ?? hit.id),
       );
+      const lifecycleMismatch =
+        acceptableStatuses.size > 0 &&
+        requiredHits.some(
+          (hit) => !hit.status || !acceptableStatuses.has(hit.status.toLowerCase()),
+        );
       const firstRelevant = actualEvidenceIds.findIndex((id) => required.includes(id));
-      const provenanceComplete = requiredMissing.length === 0 && requiredHits.every(
-        (hit) => Boolean(hit.sourceCommit || hit.evidenceUrls.length),
-      );
+      const provenanceComplete =
+        requiredMissing.length === 0 &&
+        requiredHits.every((hit) =>
+          Boolean(hit.sourceCommit || hit.evidenceUrls.length),
+        );
       const failureTypes: RetrievalCaseResultV2["failureTypes"] = [];
       if (requiredMissing.length || anyOfMissing.length || forbiddenFound.length) {
         failureTypes.push(intentFailure(testCase.intent));
@@ -47,8 +53,12 @@ export function evaluateRetrieval(
       if (!provenanceComplete) failureTypes.push("provenance");
       return {
         id: testCase.id,
-        passed: requiredMissing.length === 0 && anyOfMissing.length === 0 &&
-          forbiddenFound.length === 0 && !lifecycleMismatch && provenanceComplete,
+        passed:
+          requiredMissing.length === 0 &&
+          anyOfMissing.length === 0 &&
+          forbiddenFound.length === 0 &&
+          !lifecycleMismatch &&
+          provenanceComplete,
         actualEvidenceIds,
         requiredFound,
         requiredMissing,

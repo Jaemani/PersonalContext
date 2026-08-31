@@ -18,7 +18,7 @@ export interface ExistingAgentConnection {
   args: string[];
   raw: string;
   scope?: string;
-  /** False when human-readable CLI output cannot be restored without guessing. */
+  /** False when a CLI's human output cannot be parsed safely enough to restore. */
   rollbackSafe?: boolean;
 }
 

@@ -110,6 +110,11 @@ See [KNOWLEDGE_CONTRACT.md](docs/KNOWLEDGE_CONTRACT.md),
 [PRODUCT_BOUNDARY.md](docs/PRODUCT_BOUNDARY.md), and
 [SECURITY.md](SECURITY.md).
 
+For implementation agents, [LLM_CONTEXT.md](docs/LLM_CONTEXT.md) is the concise
+map of product intent, package ownership, change routing, invariants, and release
+gates. Dated handoff documents are milestone snapshots rather than the general
+source of truth.
+
 ## Privacy and installation
 
 For implementation ownership, retrieval behavior, failure recovery, and release

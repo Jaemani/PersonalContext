@@ -16,6 +16,12 @@ advance independently.
 Golden cases name a user query and at least one acceptable title. A case passes
 when the expected record appears within its bounded result set.
 
+Schema v2 cases use stable evidence IDs and an explicit query intent. Current-rule
+cases apply lifecycle-aware ranking so `active` and `current` records outrank
+`proposed` or `candidate` alternatives. Temporal cases retain ordinary lexical
+ranking so historical and superseded records remain discoverable. Lifecycle is
+therefore query-scoped, never a global status boost.
+
 Track:
 
 - top-k hit rate
@@ -23,6 +29,8 @@ Track:
 - evidence availability
 - returned context size
 - cold start and warm query latency
+- current-rule lifecycle mismatches
+- provenance completeness for required evidence
 
 RetrievalCase v2 uses stable `evidence_id` values rather than titles and records
 the query intent, required and forbidden evidence, lifecycle expectations,
