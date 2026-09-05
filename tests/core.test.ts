@@ -53,6 +53,35 @@ describe("portable knowledge contract", () => {
     );
   });
 
+  it("treats accepted knowledge as a current rule", async () => {
+    const records = await readKnowledgeStore(fixtureRoot);
+    const base = records.find(
+      (record) => record.evidenceId === "fixture:context-boundary-active",
+    );
+    expect(base).toBeDefined();
+
+    const index = new PersonalKnowledgeIndex([
+      {
+        ...base!,
+        id: "aa-reviewed",
+        path: "Wiki/System/Context Boundary - Reviewed.md",
+        status: "reviewed",
+        evidenceId: "fixture:context-boundary-reviewed",
+      },
+      {
+        ...base!,
+        id: "zz-accepted",
+        path: "Wiki/System/Context Boundary - Accepted.md",
+        status: "accepted",
+        evidenceId: "fixture:context-boundary-accepted",
+      },
+    ]);
+
+    const current = index.search("현재 context boundary rule", {}, 1);
+
+    expect(current[0]?.evidenceId).toBe("fixture:context-boundary-accepted");
+  });
+
   it("reports a valid fixture store", async () => {
     const records = await readKnowledgeStore(fixtureRoot);
     const report = inspectKnowledgeStore(fixtureRoot, records);

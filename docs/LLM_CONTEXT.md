@@ -103,8 +103,8 @@ playbooks and three evidence or precedent records. Use `trace_evidence` before
 relying on a selected record's full details.
 
 Default retrieval remains deterministic lexical/fuzzy search. Current-rule
-queries boost `active` and `current`, demote proposed and historical records,
-and never remove history from temporal search. RetrievalCase v2 uses stable
+queries boost `active`, `current`, and `accepted`, demote proposed and historical
+records, and never remove history from temporal search. RetrievalCase v2 uses stable
 `evidence_id`, explicit intent, required and forbidden evidence, lifecycle
 expectations, MRR, recall@k, and provenance completeness.
 

@@ -188,8 +188,8 @@ function inferRetrievalIntent(query: string): RetrievalIntent {
 function currentRuleLifecycleWeight(status: string | null): number {
   const normalized = status?.trim().toLowerCase();
   if (!normalized) return 1;
-  if (["active", "current"].includes(normalized)) return 2;
-  if (["proposed", "candidate", "draft"].includes(normalized)) return 0.55;
+  if (["active", "current", "accepted"].includes(normalized)) return 2;
+  if (["candidate", "proposed", "draft"].includes(normalized)) return 0.55;
   if (
     ["historical", "superseded", "deprecated", "archived", "retired"].includes(
       normalized,
